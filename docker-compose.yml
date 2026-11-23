@@ -1,0 +1,17 @@
+# VPS all-in-one: bot + Ollama AI in Docker.  Run:  docker compose up -d --build
+# then pull the model once:  docker compose exec ollama ollama pull qwen2.5:3b
+services:
+  ollama:
+    image: ollama/ollama
+    restart: always
+    volumes: [ollama:/root/.ollama]
+  bot:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      OLLAMA_URL: http://ollama:11434
+    volumes: ["./data:/app/data", "./kb.md:/app/kb.md"]
+    depends_on: [ollama]
+volumes:
+  ollama:
