@@ -12,12 +12,13 @@ if ! command -v ollama >/dev/null 2>&1; then
   echo "==> Installing Ollama (self-hosted AI)"
   curl -fsSL https://ollama.com/install.sh | sh
 fi
+[ -f .env ] || bash setup_env.sh
 MODEL=$(grep -E '^OLLAMA_MODEL=' .env 2>/dev/null | cut -d= -f2)
 MODEL=${MODEL:-qwen2.5:3b}
 echo "==> Pulling AI model $MODEL (one time, can take a few minutes)"
 ollama pull "$MODEL"
 
-[ -f .env ] || { cp .env.example .env; echo "==> Created .env — EDIT IT and put your DISCORD_TOKEN"; }
+
 
 echo "==> Creating systemd service"
 sudo tee /etc/systemd/system/axionhost-bot.service >/dev/null <<UNIT
@@ -39,5 +40,5 @@ UNIT
 sudo systemctl daemon-reload
 sudo systemctl enable axionhost-bot
 echo
-echo "DONE. 1) nano .env  (add token)   2) sudo systemctl start axionhost-bot"
+sudo systemctl start axionhost-bot && echo "DONE - bot started."
 echo "Logs: journalctl -u axionhost-bot -f"

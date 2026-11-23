@@ -18,17 +18,16 @@ Ban/Kick/Moderate Members, View Audit Log, Manage Messages, Embed Links, Attach 
 
 ### Mode A: on your VPS (bot + AI together)
     git clone https://github.com/devhub201/Axion---aio && cd Axion---aio
-    bash install.sh                 # Python deps + Ollama + model + systemd service
-    nano .env                       # DISCORD_TOKEN, GUILD_ID, OWNER_IDS
-    sudo systemctl start axionhost-bot
+    bash install.sh        # asks token / server ID / your ID, then installs everything and starts the bot
     journalctl -u axionhost-bot -f
+No nano needed. To re-create .env later in one line: `bash setup_env.sh TOKEN GUILD_ID YOUR_ID`.
 Docker alternative: `cp .env.example .env`, edit, `docker compose up -d --build`, then `docker compose exec ollama ollama pull qwen2.5:3b`.
 
 ### Mode B: on a bot-hosting panel (Pterodactyl etc.) — AI stays on your VPS
 Bot hosts are too small/limited for Ollama, so the bot runs there and talks to the Ollama on your VPS.
 1. **VPS:** install Ollama (`curl -fsSL https://ollama.com/install.sh | sh && ollama pull qwen2.5:3b`), then `bash ollama_remote.sh <BOT_HOST_IP>` (opens port 11434 only for the bot host).
 2. **Bot host:** upload all files (or pull from GitHub). Python 3.10+. Startup command: `bash start.sh` (installs requirements automatically, then runs bot.py).
-3. **Bot host variables / .env:** `DISCORD_TOKEN`, `GUILD_ID`, `OWNER_IDS`, `OLLAMA_URL=http://YOUR_VPS_IP:11434`.
+3. **Bot host variables** (panel Startup/Variables tab; no file editing): `DISCORD_TOKEN`, `GUILD_ID`, `OWNER_IDS`, `OLLAMA_URL=http://YOUR_VPS_IP:11434`.
 4. Start the server, then run `/ai status` in Discord to confirm the AI is reachable.
 No VPS AI yet? The bot still works; ticket AI shows a clear "AI unavailable" notice and staff take over, and announcements fall back to templates.
 
