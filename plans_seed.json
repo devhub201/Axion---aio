@@ -1,1 +1,489 @@
-[]
+[
+ {
+  "key": "intel-mc",
+  "kind": "minecraft",
+  "group": "minecraft",
+  "color": 3900150,
+  "title": "INTEL MINECRAFT PLANS",
+  "header": [
+   "✦ **CPU:** Intel Platinum",
+   "✦ **Network:** 1 Gbps",
+   "✦ **Pricing:** 8₹ / GB RAM"
+  ],
+  "plans": [
+   {
+    "name": "DIRT",
+    "emoji": "🟫",
+    "lines": [
+     "**12 GB RAM**",
+     "**2 CPU Cores**",
+     "**120 GB NVMe Storage**",
+     "**96 INR / Month**"
+    ]
+   },
+   {
+    "name": "STONE",
+    "emoji": "🪨",
+    "lines": [
+     "**16 GB RAM**",
+     "**4 CPU Cores**",
+     "**160 GB NVMe Storage**",
+     "**128 INR / Month**"
+    ]
+   },
+   {
+    "name": "IRON",
+    "emoji": "⚙️",
+    "lines": [
+     "**24 GB RAM**",
+     "**4 CPU Cores**",
+     "**250 GB NVMe Storage**",
+     "**192 INR / Month**"
+    ]
+   },
+   {
+    "name": "GOLD",
+    "emoji": "🥇",
+    "lines": [
+     "**32 GB RAM**",
+     "**4 CPU Cores**",
+     "**320 GB NVMe Storage**",
+     "**256 INR / Month**"
+    ]
+   },
+   {
+    "name": "DIAMOND",
+    "emoji": "💎",
+    "lines": [
+     "**48 GB RAM**",
+     "**6 CPU Cores**",
+     "**480 GB NVMe Storage**",
+     "**384 INR / Month**"
+    ]
+   },
+   {
+    "name": "NETHERITE",
+    "emoji": "🟪",
+    "lines": [
+     "**64 GB RAM**",
+     "**8 CPU Cores**",
+     "**640 GB NVMe Storage**",
+     "**512 INR / Month**"
+    ]
+   }
+  ],
+  "footer": "High performance **NVMe storage** with stable and fast network.\nTo purchase, please **create a ticket**."
+ },
+ {
+  "key": "amd-mc",
+  "kind": "minecraft",
+  "group": "minecraft",
+  "color": 14427686,
+  "title": "AMD MINECRAFT PLANS",
+  "header": [
+   "✦ **CPU:** AMD Ryzen 7/9",
+   "✦ **Network:** 1 Gbps",
+   "✦ **Pricing:** 10₹ / GB RAM"
+  ],
+  "plans": [
+   {
+    "name": "DIRT",
+    "emoji": "🟫",
+    "lines": [
+     "**12 GB RAM**",
+     "**2 CPU Cores**",
+     "**120 GB NVMe Storage**",
+     "**120 INR / Month**"
+    ]
+   },
+   {
+    "name": "STONE",
+    "emoji": "🪨",
+    "lines": [
+     "**16 GB RAM**",
+     "**4 CPU Cores**",
+     "**160 GB NVMe Storage**",
+     "**160 INR / Month**"
+    ]
+   },
+   {
+    "name": "IRON",
+    "emoji": "⚙️",
+    "lines": [
+     "**24 GB RAM**",
+     "**4 CPU Cores**",
+     "**250 GB NVMe Storage**",
+     "**240 INR / Month**"
+    ]
+   },
+   {
+    "name": "GOLD",
+    "emoji": "🥇",
+    "lines": [
+     "**32 GB RAM**",
+     "**4 CPU Cores**",
+     "**320 GB NVMe Storage**",
+     "**320 INR / Month**"
+    ]
+   },
+   {
+    "name": "DIAMOND",
+    "emoji": "💎",
+    "lines": [
+     "**48 GB RAM**",
+     "**6 CPU Cores**",
+     "**480 GB NVMe Storage**",
+     "**480 INR / Month**"
+    ]
+   },
+   {
+    "name": "NETHERITE",
+    "emoji": "🟪",
+    "lines": [
+     "**64 GB RAM**",
+     "**8 CPU Cores**",
+     "**640 GB NVMe Storage**",
+     "**640 INR / Month**"
+    ]
+   }
+  ],
+  "footer": "High performance **NVMe storage** with stable and fast network.\nTo purchase, please **create a ticket**."
+ },
+ {
+  "key": "ryzen-mc",
+  "kind": "minecraft",
+  "group": "minecraft",
+  "color": 16347926,
+  "title": "RYZEN MINECRAFT PLANS",
+  "header": [
+   "✦ **CPU:** Ryzen 9",
+   "✦ **Network:** 1 Gbps",
+   "✦ **Pricing:** 12₹ / GB RAM"
+  ],
+  "plans": [
+   {
+    "name": "DIRT",
+    "emoji": "🟫",
+    "lines": [
+     "**12 GB RAM**",
+     "**2 CPU Cores**",
+     "**120 GB NVMe Storage**",
+     "**144 INR / Month**"
+    ]
+   },
+   {
+    "name": "STONE",
+    "emoji": "🪨",
+    "lines": [
+     "**16 GB RAM**",
+     "**4 CPU Cores**",
+     "**160 GB NVMe Storage**",
+     "**192 INR / Month**"
+    ]
+   },
+   {
+    "name": "IRON",
+    "emoji": "⚙️",
+    "lines": [
+     "**24 GB RAM**",
+     "**4 CPU Cores**",
+     "**250 GB NVMe Storage**",
+     "**288 INR / Month**"
+    ]
+   },
+   {
+    "name": "GOLD",
+    "emoji": "🥇",
+    "lines": [
+     "**32 GB RAM**",
+     "**4 CPU Cores**",
+     "**320 GB NVMe Storage**",
+     "**384 INR / Month**"
+    ]
+   },
+   {
+    "name": "DIAMOND",
+    "emoji": "💎",
+    "lines": [
+     "**48 GB RAM**",
+     "**6 CPU Cores**",
+     "**480 GB NVMe Storage**",
+     "**576 INR / Month**"
+    ]
+   },
+   {
+    "name": "NETHERITE",
+    "emoji": "🟪",
+    "lines": [
+     "**64 GB RAM**",
+     "**8 CPU Cores**",
+     "**640 GB NVMe Storage**",
+     "**768 INR / Month**"
+    ]
+   }
+  ],
+  "footer": "High performance **NVMe storage** with stable and fast network.\nTo purchase, please **create a ticket**."
+ },
+ {
+  "key": "intel-vps",
+  "kind": "vps",
+  "group": "vps",
+  "color": 3900150,
+  "title": "INTEL VPS PLANS",
+  "header": [
+   "✦ **CPU:** Intel Xeon Gold 6138",
+   "✦ **Network:** 1 Gbps",
+   "✦ **Pricing:** 8₹ / GB RAM"
+  ],
+  "plans": [
+   {
+    "name": "VPS Starter",
+    "emoji": "server",
+    "lines": [
+     "**12 GB RAM**",
+     "**2 CPU Cores**",
+     "**120 GB NVMe Storage**",
+     "**96 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Standard",
+    "emoji": "server",
+    "lines": [
+     "**16 GB RAM**",
+     "**4 CPU Cores**",
+     "**160 GB NVMe Storage**",
+     "**128 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Advanced",
+    "emoji": "server",
+    "lines": [
+     "**24 GB RAM**",
+     "**4 CPU Cores**",
+     "**250 GB NVMe Storage**",
+     "**192 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Performance",
+    "emoji": "server",
+    "lines": [
+     "**32 GB RAM**",
+     "**4 CPU Cores**",
+     "**320 GB NVMe Storage**",
+     "**256 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Enterprise",
+    "emoji": "server",
+    "lines": [
+     "**48 GB RAM**",
+     "**6 CPU Cores**",
+     "**480 GB NVMe Storage**",
+     "**384 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Ultimate",
+    "emoji": "server",
+    "lines": [
+     "**64 GB RAM**",
+     "**8 CPU Cores**",
+     "**640 GB NVMe Storage**",
+     "**512 INR / Month**"
+    ]
+   }
+  ],
+  "footer": "High performance **NVMe storage** with stable and fast network.\nTo purchase, please **create a ticket**."
+ },
+ {
+  "key": "amd-vps",
+  "kind": "vps",
+  "group": "vps",
+  "color": 14427686,
+  "title": "AMD VPS PLANS",
+  "header": [
+   "✦ **CPU:** AMD Ryzen 7/9",
+   "✦ **Network:** 1 Gbps",
+   "✦ **Pricing:** 10₹ / GB RAM"
+  ],
+  "plans": [
+   {
+    "name": "VPS Starter",
+    "emoji": "server",
+    "lines": [
+     "**12 GB RAM**",
+     "**2 CPU Cores**",
+     "**120 GB NVMe Storage**",
+     "**120 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Standard",
+    "emoji": "server",
+    "lines": [
+     "**16 GB RAM**",
+     "**4 CPU Cores**",
+     "**160 GB NVMe Storage**",
+     "**160 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Advanced",
+    "emoji": "server",
+    "lines": [
+     "**24 GB RAM**",
+     "**4 CPU Cores**",
+     "**250 GB NVMe Storage**",
+     "**240 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Performance",
+    "emoji": "server",
+    "lines": [
+     "**32 GB RAM**",
+     "**4 CPU Cores**",
+     "**320 GB NVMe Storage**",
+     "**320 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Enterprise",
+    "emoji": "server",
+    "lines": [
+     "**48 GB RAM**",
+     "**6 CPU Cores**",
+     "**480 GB NVMe Storage**",
+     "**480 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Ultimate",
+    "emoji": "server",
+    "lines": [
+     "**64 GB RAM**",
+     "**8 CPU Cores**",
+     "**640 GB NVMe Storage**",
+     "**640 INR / Month**"
+    ]
+   }
+  ],
+  "footer": "High performance **NVMe storage** with stable and fast network.\nTo purchase, please **create a ticket**."
+ },
+ {
+  "key": "ryzen-vps",
+  "kind": "vps",
+  "group": "vps",
+  "color": 16347926,
+  "title": "RYZEN VPS PLANS",
+  "header": [
+   "✦ **CPU:** Ryzen 9",
+   "✦ **Network:** 1 Gbps",
+   "✦ **Pricing:** 12₹ / GB RAM"
+  ],
+  "plans": [
+   {
+    "name": "VPS Starter",
+    "emoji": "server",
+    "lines": [
+     "**12 GB RAM**",
+     "**2 CPU Cores**",
+     "**120 GB NVMe Storage**",
+     "**144 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Standard",
+    "emoji": "server",
+    "lines": [
+     "**16 GB RAM**",
+     "**4 CPU Cores**",
+     "**160 GB NVMe Storage**",
+     "**192 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Advanced",
+    "emoji": "server",
+    "lines": [
+     "**24 GB RAM**",
+     "**4 CPU Cores**",
+     "**250 GB NVMe Storage**",
+     "**288 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Performance",
+    "emoji": "server",
+    "lines": [
+     "**32 GB RAM**",
+     "**4 CPU Cores**",
+     "**320 GB NVMe Storage**",
+     "**384 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Enterprise",
+    "emoji": "server",
+    "lines": [
+     "**48 GB RAM**",
+     "**6 CPU Cores**",
+     "**480 GB NVMe Storage**",
+     "**576 INR / Month**"
+    ]
+   },
+   {
+    "name": "VPS Ultimate",
+    "emoji": "server",
+    "lines": [
+     "**64 GB RAM**",
+     "**8 CPU Cores**",
+     "**640 GB NVMe Storage**",
+     "**768 INR / Month**"
+    ]
+   }
+  ],
+  "footer": "High performance **NVMe storage** with stable and fast network.\nTo purchase, please **create a ticket**."
+ },
+ {
+  "key": "rewards",
+  "kind": "rewards",
+  "group": "rewards",
+  "color": 15485081,
+  "title": "Minecraft & VPS Rewards",
+  "header": [
+   "☁︎ **S-12** ﹒ 12 GB RAM ・ 2 vCores ・ 20 GB Disk",
+   "☁︎ **S-24** ﹒ 24 GB RAM ・ 4 vCores ・ 50 GB Disk",
+   "☁︎ **S-32** ﹒ 32 GB RAM ・ 6 vCores ・ 80 GB Disk",
+   "☁︎ **S-48** ﹒ 48 GB RAM ・ 8 vCores ・ 80 GB Disk",
+   "☁︎ **S-128** ﹒ 128 GB RAM ・ 12 vCores ・ 128 GB Disk"
+  ],
+  "blocks": [
+   {
+    "name": "☁︎ Minecraft Rewards",
+    "lines": [
+     "6 inv → S-12 ・ 12 inv → S-24 ・ 25 inv → S-32 ・ 35 inv → S-48 ・ 50 inv → S-128",
+     "1 boost → S-32 ・ 2 boosts → S-48 ・ 3 boosts → S-128"
+    ]
+   },
+   {
+    "name": "☁︎ Free VPS Rewards",
+    "lines": [
+     "3 inv → 12 GB • 2 Cores • 20 GB",
+     "8 inv → 24 GB • 4 Cores • 50 GB",
+     "12 inv → 32 GB • 6 Cores • 80 GB",
+     "16 inv → 48 GB • 8 Cores • 80 GB",
+     "25 inv → 128 GB • 12 Cores • 128 GB",
+     "1 boost → 32 GB • 6 Cores • 80 GB",
+     "2 boosts → 48 GB • 8 Cores • 80 GB",
+     "3 boosts → 128 GB • 12 Cores • 128 GB"
+    ]
+   }
+  ],
+  "footer": "Once you've hit the required invites or boosts, open a ticket to claim your reward.\n⚠︎ Limited availability ・ You are responsible for your own backups"
+ }
+]

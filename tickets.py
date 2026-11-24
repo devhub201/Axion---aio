@@ -20,6 +20,7 @@ CATEGORIES = {
     "support": ("Technical Support", "support", "Setup help, errors, downtime"),
     "billing": ("Billing & Payments", "billing", "Payments, invoices, renewals"),
     "partner": ("Partnership", "star", "Collabs, resellers, business"),
+    "rewards": ("Claim Reward", "gift", "Claim invite / booster rewards"),
     "report": ("Report / Abuse", "shield", "Report abuse or a security problem"),
 }
 
@@ -30,6 +31,7 @@ DEFAULT_PANEL = {
         "{diamond} **Sales** — plans, pricing, custom orders\n"
         "{support} **Technical Support** — setup help, errors, downtime\n"
         "{billing} **Billing** — payments, invoices, renewals\n"
+        "{gift} **Claim Reward** — invite & booster rewards\n"
         "{star} **Partnership** — collabs & business\n"
         "{shield} **Report** — abuse or security issues\n" + brand.LINE + "\n"
         "{robot} **Axion AI** replies instantly, and {members} our staff steps in whenever you need.\n"

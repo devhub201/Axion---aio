@@ -48,6 +48,7 @@ Model size: 2-4 GB RAM -> qwen2.5:1.5b, 4-8 GB -> qwen2.5:3b (default), 8 GB+ ->
 - **AutoMod**: spam, repeats, invites, links, caps, mass mentions, emoji spam, bad words, escalating timeouts.
 
 ## v1.1 — more features
+- **Plans (AxionHost real plans built in)**: `plans_seed.json` holds 6 Minecraft/VPS tier embeds (Intel, AMD, Ryzen) + the invite/booster rewards embed. Run `/plans load-defaults` once, then `/plans post group:... tier:... channel:...`. To change a price, edit `plans_seed.json` on GitHub, `git pull`/re-upload, and run `/plans load-defaults` again. The ticket AI reads these prices live.
 - **Hosting tools**: `/plans add` + `/plans post` (plans embed with an **Order now** button that opens a Sales ticket), `/host payments|tos|vouch-channel|customer-role`, `/customer`, `/vouch` (1-5 stars) + `/vouches` rating. Plans you add are fed to the ticket AI automatically, so it quotes real prices.
 - **Levels**: XP per message, rank card image (`/rank`), `/leaderboard`, level-role rewards (`/level role add`), double-XP via `/level settings multiplier`.
 - **BOLTs economy**: `/daily` (streak), `/work`, `/pay`, `/coinflip`, `/slots`, `/richest`, role shop (`/shop add|buy`).
