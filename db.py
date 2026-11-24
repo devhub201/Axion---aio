@@ -85,6 +85,10 @@ class Database:
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.executescript(SCHEMA)
+            try:
+                self._conn.execute("ALTER TABLE tickets ADD COLUMN rating INTEGER")
+            except sqlite3.OperationalError:
+                pass                                  # column already exists
             self._conn.commit()
 
     # -- raw helpers ---------------------------------------------------------

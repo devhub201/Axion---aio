@@ -2,6 +2,7 @@
 Plans are also written to data/plans_kb.md so the ticket AI quotes your REAL prices."""
 import json
 import os
+import re
 from typing import Optional
 
 import discord
@@ -77,32 +78,33 @@ class Hosting(commands.Cog, name="Hosting"):
 
     def _write_kb(self, sections):
         os.makedirs("data", exist_ok=True)
+        clean = lambda t: re.sub(r"\{\w+\}\s*", "", t).replace("**", "")
         lines = ["## LIVE PLANS & REWARDS (official, set by staff — always quote these exactly; prices are per month in INR)"]
         for sec in sections:
             lines.append(f"### {sec['title']}")
-            lines += list(sec.get("header", []))
+            lines += [clean(h) for h in sec.get("header", [])]
             for p in sec.get("plans", []):
-                lines.append(f"- {p['name']}: " + " | ".join(p["lines"]))
+                lines.append(f"- {p['name']}: " + " | ".join(clean(x) for x in p["lines"]))
             for blk in sec.get("blocks", []):
-                lines.append(f"{blk['name']}: " + " ; ".join(blk["lines"]))
+                lines.append(f"{clean(blk['name'])}: " + " ; ".join(clean(x) for x in blk["lines"]))
             if sec["kind"] == "rewards":
                 lines.append("Rewards are claimed by opening a ticket after reaching the invites/boosts.")
-        text = "\n".join(lines).replace("**", "")
         with open(PLANS_KB, "w", encoding="utf-8") as fh:
-            fh.write(text[:6000])
+            fh.write("\n".join(lines)[:6000])
 
     def _section_embed(self, g, sec):
         emo = self.bot.emo
+        f = lambda t: emo.fmt(t, g)
         em = discord.Embed(title=f"{emo.get('crown' if sec['kind'] == 'rewards' else ('rocket' if sec['kind'] == 'minecraft' else 'server'), g)} {sec['title']}",
-                           description="\n".join(sec.get("header", [])) + f"\n{brand.LINE}", color=sec.get("color", 0x8B5CF6))
+                           description="\n".join(f(h) for h in sec.get("header", [])) + f"\n{brand.LINE}", color=sec.get("color", 0x8B5CF6))
         for p in sec.get("plans", []):
             icon = p.get("emoji", "diamond")
             shown = emo.get(icon, g) if icon.isalnum() else icon
-            em.add_field(name=f"{shown} {p['name']}", value="\n".join(f"⌯⌲ {l}" for l in p["lines"]), inline=True)
+            em.add_field(name=f"{shown} {p['name']}", value="\n".join(f(l) for l in p["lines"]), inline=True)
         for blk in sec.get("blocks", []):
-            em.add_field(name=blk["name"], value="\n".join(f"> {l}" for l in blk["lines"])[:1024], inline=False)
+            em.add_field(name=f(blk["name"]), value="\n".join(f"> {f(l)}" for l in blk["lines"])[:1024], inline=False)
         if sec.get("footer"):
-            em.add_field(name="\u200b", value="\n".join(f"> {l}" for l in sec["footer"].split("\n")), inline=False)
+            em.add_field(name="\u200b", value="\n".join(f"> {f(l)}" for l in sec["footer"].split("\n"))[:1024], inline=False)
         em.set_footer(text=f"{brand.NAME} • Premium Hosting")
         em.timestamp = discord.utils.utcnow()
         return em

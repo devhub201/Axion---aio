@@ -55,6 +55,13 @@ Model size: 2-4 GB RAM -> qwen2.5:1.5b, 4-8 GB -> qwen2.5:3b (default), 8 GB+ ->
 - **Engage**: polls with live bars, suggestions with vote/approve/deny, reminders, AFK, 8ball, dice, avatar.
 - **Staff tools**: `/embed` builder, reaction-role button panels, sticky messages, auto-responders (FAQ), starboard, join-to-create voice channels, `/say`.
 
+## v1.2
+- **AI role panels**: `/rolepanel ai role1:@Updates role2:@Giveaways ...` — you give ONLY the roles; the AI writes the title, description, per-role emoji and blurb. Preview -> Post / Regenerate / Cancel. Buttons give or remove the role (works after restarts).
+- **Auto roles**: `/autorole add @Member` (humans) or `who:Bots`, `/autorole remove`, `/autorole list`.
+- **New animated emojis**: `ram`, `disk`, `money` (31 total). The plan embeds now show RAM / CPU / disk / price with them. Run `/emoji install` once to add the new ones (the bot also does it on restart).
+- **Ticket ratings**: after a ticket closes the customer gets a DM with 1-5 stars; ratings are logged and shown in `/ticket stats`.
+- **Server stats**: `/serverstats setup` creates live voice channels (members, bots, boosts, open tickets).
+
 ## Edit the AI's knowledge
 `nano kb.md` - changes apply instantly. The AI never invents prices; it only uses this file.
 

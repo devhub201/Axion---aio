@@ -624,6 +624,64 @@ def members(cv, t):
     cv.commit(L)
 
 
+def ram(cv, t):
+    L, d = cv.new()
+    for i in range(16):                                   # gold pins
+        x = 9 + i * 5.0
+        d.rect((x, 66, x + 3, 77), rgba(C['gold']))
+    d.rrect((6, 24, 90, 68), 5, rgba((22, 130, 90)), outline=rgba((74, 222, 128)), width=2)
+    d.rrect((6, 24, 90, 32), 3, rgba(C['violet']))        # heat-spreader strip
+    d.ellipse((44, 62, 52, 70), rgba(0, 0, 0, 0))         # notch
+    cv.commit(L)
+    L, d = cv.new()
+    for i in range(4):
+        x = 12 + i * 20
+        p = pulse(t, -i * 0.18)
+        col = tuple(int(a + (b - a) * p) for a, b in zip(C['dark'], C['cyan']))
+        d.rrect((x, 37, x + 16, 58), 3, rgba(col), outline=rgba(C['white'], 120), width=1)
+        d.rect((x + 4, 43, x + 12, 45), rgba(C['white'], int(80 + 120 * p)))
+    cv.commit(L)
+
+
+def disk(cv, t):
+    L, d = cv.new()
+    d.rrect((14, 26, 90, 70), 7, rgba(C['slate']), outline=rgba(C['cyan']), width=2.5)
+    d.rrect((4, 36, 18, 60), 2, rgba(C['gold']))
+    for i in range(5):
+        d.line([(6, 38 + i * 5), (16, 38 + i * 5)], rgba(C['orange']), 1.2)
+    d.rrect((26, 33, 82, 63), 5, rgba(C['indigo']))
+    d.poly([(52, 38), (44, 50), (51, 50), (47, 59), (60, 46), (53, 46)], rgba(C['yellow']))
+    d.ellipse((82, 31, 88, 37), rgba(C['green'] if pulse(t * 2) > 0.4 else shade(C['green'], .3)))
+    cv.commit(L)
+    L, d = cv.new()
+    x = 26 + 44 * t
+    d.rect((x, 33, x + 9, 63), rgba(C['white'], 110))
+    M, md = cv.new()
+    md.rrect((26, 33, 82, 63), 5, rgba(C['white']))
+    cv.commit(L, mask=M)
+
+
+def money(cv, t):
+    w = max(0.14, abs(math.cos(2 * math.pi * t)))
+    cv.glow(lambda d, c: d.ellipse((48 - 36 * w, 12, 48 + 36 * w, 84), c), C['yellow'], blur=5, alpha=0.35)
+    L, d = cv.new()
+    d.ellipse((48 - 38 * w, 10, 48 + 38 * w, 86), rgba(C['orange']))
+    d.ellipse((48 - 35 * w, 13, 48 + 35 * w, 83), rgba(C['gold']))
+    d.ellipse((48 - 28 * w, 20, 48 + 28 * w, 76), outline=rgba(C['orange']), width=2)
+    d.ellipse((48 - 30 * w, 16, 48 - 6 * w, 34), rgba(255, 255, 255, 90))
+    cv.commit(L)
+    if w > 0.55:
+        L = Image.new("RGBA", (BIG, BIG), (0, 0, 0, 0))
+        dr = ImageDraw.Draw(L)
+        f = _font(int(50 * SS * min(1.0, w + 0.1)))
+        bb = dr.textbbox((0, 0), "$", font=f)
+        dr.text((48 * SS - (bb[2] - bb[0]) / 2 - bb[0], 48 * SS - (bb[3] - bb[1]) / 2 - bb[1]), "$", font=f, fill=rgba(C['orange']))
+        cv.im.alpha_composite(L)
+    L, d = cv.new()
+    sparkle(d, 78, 18, 9 * max(0.0, math.sin(math.pi * t)), rgba(C['white']))
+    cv.commit(L)
+
+
 ICONS = {
     "rocket": rocket, "server": server, "bolt": bolt, "online": online, "offline": offline,
     "maintenance": maintenance, "shield": shield, "diamond": diamond, "ticket": ticket,
@@ -631,6 +689,7 @@ ICONS = {
     "crown": crown, "bell": bell, "check": check, "cross": cross, "warn": warn, "fire": fire,
     "lock": lock, "gift": gift, "star": star, "cpu": cpu, "robot": robot, "wifi": wifi,
     "megaphone": megaphone, "members": members,
+    "ram": ram, "disk": disk, "money": money,
 }
 
 # unicode fallbacks used until custom emojis are installed
@@ -640,6 +699,7 @@ FALLBACK = {
     "support": "💬", "globe": "🌐", "backup": "💾", "stats": "📊", "crown": "👑", "bell": "🔔",
     "check": "✅", "cross": "❌", "warn": "⚠️", "fire": "🔥", "lock": "🔒", "gift": "🎁",
     "star": "⭐", "cpu": "🧠", "robot": "🤖", "wifi": "📶", "megaphone": "📢", "members": "👥",
+    "ram": "🎛️", "disk": "💽", "money": "💵",
 }
 
 DESCRIPTIONS = {
@@ -652,6 +712,7 @@ DESCRIPTIONS = {
     "lock": "locked / secure", "gift": "giveaways", "star": "rating / featured",
     "cpu": "hardware / CPU", "robot": "AI assistant", "wifi": "latency / ping",
     "megaphone": "announcements", "members": "community",
+    "ram": "RAM / memory", "disk": "NVMe disk / storage", "money": "price / payments",
 }
 
 

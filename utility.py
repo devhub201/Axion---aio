@@ -53,6 +53,47 @@ class EmbedModal(discord.ui.Modal, title="Embed builder"):
         await interaction.response.send_message(embed=brand.embed(self.bot, "ok", "Posted", msg.jump_url, guild=g), ephemeral=True)
 
 
+class RolePanelPreview(discord.ui.View):
+    def __init__(self, cog, author_id, guild, roles, brief, lang, data, note, channel):
+        super().__init__(timeout=900)
+        self.cog, self.author_id, self.guild, self.roles = cog, author_id, guild, roles
+        self.brief, self.lang, self.data, self.note, self.channel = brief, lang, data, note, channel
+        self.message = None
+
+    def preview(self):
+        return self.cog._panel_parts(self.guild, self.roles, self.data)
+
+    def content(self):
+        return f"⚠️ {self.note}" if self.note else f"Preview — posts to {self.channel.mention} when you press **Post**."
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This preview belongs to someone else.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Post", style=discord.ButtonStyle.success, emoji="✅")
+    async def post(self, interaction: discord.Interaction, button: discord.ui.Button):
+        em, view = self.preview()
+        try:
+            msg = await self.channel.send(embed=em, view=view)
+        except discord.HTTPException as exc:
+            return await interaction.response.send_message(f"Could not post: {exc.text}", ephemeral=True)
+        self.stop()
+        await interaction.response.edit_message(content=f"✅ Posted {msg.jump_url}", embed=None, view=None)
+
+    @discord.ui.button(label="Regenerate", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def regen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="🤖 Writing a new version...", view=None)
+        self.data, self.note = await self.cog.bot.ai.make_role_panel(self.guild, [r.name for r in self.roles], self.brief, self.lang)
+        await interaction.edit_original_response(content=self.content(), embed=self.preview()[0], view=self)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="✖️")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(content="Cancelled.", embed=None, view=None)
+
+
 class Utility(commands.Cog, name="Utility"):
     poll_g = app_commands.Group(name="poll", description="Polls", guild_only=True)
     sticky = app_commands.Group(name="sticky", description="Sticky messages",
@@ -76,10 +117,12 @@ class Utility(commands.Cog, name="Utility"):
     async def cog_load(self):
         self.remind_loop.start()
         self.poll_loop.start()
+        self.stats_loop.start()
 
     async def cog_unload(self):
         self.remind_loop.cancel()
         self.poll_loop.cancel()
+        self.stats_loop.cancel()
 
     # ================================================================== listeners
     @commands.Cog.listener()
@@ -395,6 +438,158 @@ class Utility(commands.Cog, name="Utility"):
         except discord.HTTPException as exc:
             return await interaction.response.send_message(f"I could not change that role: {exc.text}", ephemeral=True)
         await interaction.response.send_message(embed=brand.embed(self.bot, "ok", "Roles updated", text, guild=g), ephemeral=True)
+
+    # ================================================================== AI role panels + auto roles
+    autorole = app_commands.Group(name="autorole", description="Roles given automatically when someone joins",
+                                  default_permissions=discord.Permissions(manage_roles=True), guild_only=True)
+    serverstats = app_commands.Group(name="serverstats", description="Live member-count voice channels",
+                                     default_permissions=discord.Permissions(manage_channels=True), guild_only=True)
+
+    def _panel_parts(self, g, roles, data):
+        emo = self.bot.emo
+        lines = [f"{emo.get(r['emoji'], g)} {roles[i].mention} — {r['blurb']}" for i, r in enumerate(data["roles"])]
+        em = discord.Embed(title=emo.fmt(data["title"], g)[:256], description=emo.fmt(data["description"], g) + f"\n{brand.LINE}\n" + "\n".join(lines),
+                           color=0x8B5CF6)
+        em.set_footer(text=f"{brand.NAME} • Premium Hosting")
+        em.timestamp = discord.utils.utcnow()
+        view = discord.ui.View(timeout=None)
+        for i, r in enumerate(data["roles"]):
+            view.add_item(discord.ui.Button(label=roles[i].name[:40], emoji=emo.partial(r["emoji"], g),
+                                            style=discord.ButtonStyle.secondary, custom_id=f"ax:rr:{roles[i].id}"))
+        return em, view
+
+    @rolepanel.command(name="ai", description="Give me only the roles — AI writes the title, description and emojis")
+    @app_commands.describe(brief="Optional hint, e.g. 'notification roles'", lang="Language of the text", channel="Where to post")
+    @app_commands.choices(lang=[app_commands.Choice(name="Hinglish", value="hinglish"), app_commands.Choice(name="English", value="english")])
+    async def rp_ai(self, interaction: discord.Interaction, role1: discord.Role, role2: Optional[discord.Role] = None,
+                    role3: Optional[discord.Role] = None, role4: Optional[discord.Role] = None, role5: Optional[discord.Role] = None,
+                    role6: Optional[discord.Role] = None, role7: Optional[discord.Role] = None, role8: Optional[discord.Role] = None,
+                    brief: str = "", lang: Optional[app_commands.Choice[str]] = None, channel: Optional[discord.TextChannel] = None):
+        g = interaction.guild
+        roles = []
+        for r in (role1, role2, role3, role4, role5, role6, role7, role8):
+            if r and r not in roles:
+                roles.append(r)
+        bad = [r.name for r in roles if r >= g.me.top_role or r.managed or r.is_default()]
+        if bad:
+            return await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Role problem", "I cannot hand out: " + ", ".join(bad) + "\nMove my role above them.", guild=g), ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        target = channel or interaction.channel
+        data, note = await self.bot.ai.make_role_panel(g, [r.name for r in roles], brief, lang.value if lang else None)
+        view = RolePanelPreview(self, interaction.user.id, g, roles, brief, lang.value if lang else None, data, note, target)
+        view.message = await interaction.followup.send(content=view.content(), embed=view.preview()[0], view=view, ephemeral=True, wait=True)
+
+    @autorole.command(name="add", description="Give this role automatically to new members (or bots)")
+    @app_commands.choices(who=[app_commands.Choice(name="Humans", value="humans"), app_commands.Choice(name="Bots", value="bots")])
+    async def ar_add(self, interaction: discord.Interaction, role: discord.Role, who: Optional[app_commands.Choice[str]] = None):
+        g = interaction.guild
+        if role >= g.me.top_role or role.managed or role.is_default():
+            return await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Role problem", "Pick a normal role that is below my highest role.", guild=g), ephemeral=True)
+        key = who.value if who else "humans"
+        cfg = await self.bot.db.get(g.id, "autoroles", {"humans": [], "bots": []})
+        if role.id not in cfg[key]:
+            cfg[key].append(role.id)
+        await self.bot.db.set(g.id, "autoroles", cfg)
+        await interaction.response.send_message(embed=brand.embed(
+            self.bot, "ok", "Auto role added", f"New **{key}** will get {role.mention}.", guild=g), ephemeral=True)
+
+    @autorole.command(name="remove", description="Stop giving a role automatically")
+    async def ar_remove(self, interaction: discord.Interaction, role: discord.Role):
+        g = interaction.guild
+        cfg = await self.bot.db.get(g.id, "autoroles", {"humans": [], "bots": []})
+        for k in cfg:
+            cfg[k] = [r for r in cfg[k] if r != role.id]
+        await self.bot.db.set(g.id, "autoroles", cfg)
+        await interaction.response.send_message(embed=brand.embed(self.bot, "ok", "Auto role removed", role.mention, guild=g), ephemeral=True)
+
+    @autorole.command(name="list", description="Show auto roles")
+    async def ar_list(self, interaction: discord.Interaction):
+        cfg = await self.bot.db.get(interaction.guild.id, "autoroles", {"humans": [], "bots": []})
+        fmt = lambda ids: " ".join(f"<@&{i}>" for i in ids) or "none"
+        await interaction.response.send_message(embed=brand.embed(
+            self.bot, "info", "Auto roles", None, guild=interaction.guild,
+            fields=[("{members} Humans", fmt(cfg.get("humans", [])), False), ("{robot} Bots", fmt(cfg.get("bots", [])), False)]), ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        cfg = await self.bot.db.get(member.guild.id, "autoroles", None)
+        if not cfg:
+            return
+        for rid in cfg.get("bots" if member.bot else "humans", []):
+            role = member.guild.get_role(rid)
+            if role:
+                try:
+                    await member.add_roles(role, reason="Auto role")
+                except discord.HTTPException as exc:
+                    print(f"[autorole] cannot give {role.name} in {member.guild.name}: {exc} (my role must be above it)")
+
+    # ---- server stats voice channels
+    async def _stat_values(self, g):
+        tick = (await self.bot.db.fetchone("SELECT COUNT(*) c FROM tickets WHERE guild_id=? AND status='open'", (g.id,)))["c"]
+        bots = sum(1 for m in g.members if m.bot)
+        return {"members": f"👥 Members: {g.member_count}", "bots": f"🤖 Bots: {bots}",
+                "boosts": f"💎 Boosts: {g.premium_subscription_count}", "tickets": f"🎫 Open tickets: {tick}"}
+
+    @serverstats.command(name="setup", description="Create live stat channels (members, bots, boosts, open tickets)")
+    async def ss_setup(self, interaction: discord.Interaction):
+        g = interaction.guild
+        await interaction.response.defer(ephemeral=True)
+        old = await self.bot.db.get(g.id, "serverstats", None)
+        if old:
+            return await interaction.followup.send(embed=brand.embed(
+                self.bot, "err", "Already set up", "Run `/serverstats remove` first.", guild=g), ephemeral=True)
+        ow = {g.default_role: discord.PermissionOverwrite(connect=False, view_channel=True)}
+        try:
+            cat = await g.create_category("📊 Server Stats", overwrites=ow, position=0)
+            vals = await self._stat_values(g)
+            ids = {}
+            for key, name in vals.items():
+                ch = await g.create_voice_channel(name, category=cat, overwrites=ow)
+                ids[key] = ch.id
+        except discord.HTTPException as exc:
+            return await interaction.followup.send(embed=brand.embed(
+                self.bot, "err", "Could not create channels", f"{exc.text}\nI need **Manage Channels**.", guild=g), ephemeral=True)
+        await self.bot.db.set(g.id, "serverstats", {"category": cat.id, "channels": ids})
+        await interaction.followup.send(embed=brand.embed(
+            self.bot, "ok", "Server stats live", "Updates every 10 minutes (Discord limits channel renames).", guild=g), ephemeral=True)
+
+    @serverstats.command(name="remove", description="Delete the stat channels")
+    async def ss_remove(self, interaction: discord.Interaction):
+        g = interaction.guild
+        cfg = await self.bot.db.get(g.id, "serverstats", None)
+        if not cfg:
+            return await interaction.response.send_message(embed=brand.embed(self.bot, "err", "Not set up", "", guild=g), ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        for cid in list(cfg["channels"].values()) + [cfg["category"]]:
+            ch = g.get_channel(cid)
+            if ch:
+                try:
+                    await ch.delete(reason="Server stats removed")
+                except discord.HTTPException:
+                    pass
+        await self.bot.db.set(g.id, "serverstats", None)
+        await interaction.followup.send(embed=brand.embed(self.bot, "ok", "Removed", "Stat channels deleted.", guild=g), ephemeral=True)
+
+    @tasks.loop(minutes=10)
+    async def stats_loop(self):
+        for g in self.bot.guilds:
+            cfg = await self.bot.db.get(g.id, "serverstats", None)
+            if not cfg:
+                continue
+            vals = await self._stat_values(g)
+            for key, cid in cfg["channels"].items():
+                ch = g.get_channel(cid)
+                if ch and ch.name != vals.get(key):
+                    try:
+                        await ch.edit(name=vals[key], reason="Server stats")
+                    except discord.HTTPException as exc:
+                        print(f"[serverstats] {g.name}: {exc}")
+
+    @stats_loop.before_loop
+    async def _s_ready(self):
+        await self.bot.wait_until_ready()
 
     # ================================================================== sticky + responders
     @sticky.command(name="set", description="Keep a message at the bottom of this channel")

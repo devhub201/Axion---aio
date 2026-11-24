@@ -109,6 +109,13 @@ class TicketControls(discord.ui.View):
         await self.cog.send_transcript(interaction)
 
 
+class RatingView(discord.ui.View):
+    def __init__(self, ticket_id):
+        super().__init__(timeout=None)
+        for n in range(1, 6):
+            self.add_item(discord.ui.Button(label=str(n), emoji="⭐", style=discord.ButtonStyle.secondary, custom_id=f"ax:rate:{ticket_id}:{n}"))
+
+
 class ConfirmClose(discord.ui.View):
     def __init__(self, cog, row, author_id):
         super().__init__(timeout=60)
@@ -407,6 +414,10 @@ class Tickets(commands.Cog, name="Tickets"):
                     self.bot, "info", "Your ticket was closed",
                     f"Your ticket **{row['subject'][:100]}** in **{guild.name}** has been closed.\nTranscript attached.",
                     guild=guild), file=file2)
+                await member.send(embed=brand.embed(
+                    self.bot, "premium", "How was our support?",
+                    f"{{star}} Rate ticket **#{row['id']:04d}** from 1 to 5 — it helps us improve!", guild=guild),
+                    view=RatingView(row["id"]))
             except discord.HTTPException:
                 pass                                          # DMs closed — normal
         try:
@@ -425,6 +436,33 @@ class Tickets(commands.Cog, name="Tickets"):
         await self.bot.db.execute("UPDATE tickets SET status='closed', closed_at=? WHERE channel_id=? AND status='open'",
                                   (time.time(), channel.id))
         self.ai_map.pop(channel.id, None)
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type != discord.InteractionType.component:
+            return
+        cid = (interaction.data or {}).get("custom_id", "")
+        if not cid.startswith("ax:rate:"):
+            return
+        _, _, tid, n = cid.split(":")
+        row = await self.bot.db.fetchone("SELECT * FROM tickets WHERE id=?", (int(tid),))
+        if not row or row["user_id"] != interaction.user.id:
+            return await interaction.response.send_message("This rating is not for you.", ephemeral=True)
+        if row["rating"]:
+            return await interaction.response.send_message("You already rated this ticket. Thank you!", ephemeral=True)
+        await self.bot.db.execute("UPDATE tickets SET rating=? WHERE id=?", (int(n), int(tid)))
+        guild = self.bot.get_guild(row["guild_id"])
+        await interaction.response.edit_message(embed=brand.embed(
+            self.bot, "ok", "Thank you!", f"You rated this ticket {'⭐' * int(n)}", guild=guild), view=None)
+        if guild:
+            cfg = await self.cfg(guild.id)
+            log = guild.get_channel(cfg["log_id"]) if cfg["log_id"] else None
+            if log:
+                try:
+                    await log.send(embed=brand.embed(self.bot, "premium", f"Ticket #{row['id']:04d} rated",
+                                                     f"{'⭐' * int(n)}{'☆' * (5 - int(n))}  by <@{row['user_id']}>", guild=guild))
+                except discord.HTTPException:
+                    pass
 
     # ------------------------------------------------------------ commands
     @ticket.command(name="setup", description="Configure the ticket system")
@@ -543,10 +581,12 @@ class Tickets(commands.Cog, name="Tickets"):
             "SELECT claimed_by, COUNT(*) c FROM tickets WHERE guild_id=? AND claimed_by IS NOT NULL "
             "GROUP BY claimed_by ORDER BY c DESC LIMIT 5", (g,))
         board = "\n".join(f"{i + 1}. <@{r['claimed_by']}> — {r['c']}" for i, r in enumerate(top)) or "No claims yet."
+        rt = await self.bot.db.fetchone("SELECT AVG(rating) a, COUNT(rating) c FROM tickets WHERE guild_id=? AND rating IS NOT NULL", (g,))
+        avg_text = f"{rt['a']:.2f} / 5 ({rt['c']} ratings)" if rt["c"] else "no ratings yet"
         await interaction.response.send_message(embed=brand.embed(
             self.bot, "info", "Ticket stats", None, guild=interaction.guild,
             fields=[("{online} Open", str(by.get("open", 0)), True), ("{check} Closed", str(by.get("closed", 0)), True),
-                    ("{crown} Top staff", board, False)]), ephemeral=True)
+                    ("{star} Avg rating", avg_text, True), ("{crown} Top staff", board, False)]), ephemeral=True)
 
 
 async def setup(bot):

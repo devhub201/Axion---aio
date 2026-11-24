@@ -217,6 +217,53 @@ class AI:
         except AIError as exc:
             return fallback_embed(kind, brief), f"AI unavailable: {exc} — a template was used instead."
 
+    async def make_role_panel(self, guild, role_names, brief="", lang=None):
+        """AI writes the panel title, description and, per role, an emoji + one-line blurb. Returns (data, note)."""
+        lang = lang or self.default_lang
+        icon_names = ", ".join(icons.ICONS)
+        system = (
+            f"You design self-assign role panels for the Discord server of {brand.NAME}, a premium hosting brand.\n"
+            "Return ONLY JSON: {\"title\": \"...\", \"description\": \"...\", \"roles\": [{\"name\": \"exact role name\", "
+            "\"emoji\": \"icon name\", \"blurb\": \"max 60 chars\"}]}\n"
+            f"- title: max 60 chars, starts with one emoji placeholder like {{star}}.\n"
+            "- description: 150-350 chars, 2-4 short punchy lines, each starting with an emoji placeholder like {bell}, ending with a call to action to click the buttons.\n"
+            f"- For each role pick the BEST matching icon name from this list only: {icon_names}\n"
+            "- Use each given role name EXACTLY once, in the same order. Blurb says what the role is for, based only on its name.\n"
+            f"- Language: {'Hinglish (Hindi in English letters, natural and cool)' if lang == 'hinglish' else 'English'}.\n"
+            "- Never invent perks or promises that the role name does not suggest."
+        )
+        user = "Roles: " + ", ".join(role_names) + (f"\nExtra brief from admin: {brief}" if brief else "")
+        try:
+            raw = await self.chat([{"role": "system", "content": system}, {"role": "user", "content": user}],
+                                  json_mode=True, temperature=0.8, max_tokens=700)
+            data = self._parse_panel(raw, role_names)
+            if data:
+                return data, None
+            return fallback_panel(role_names), "The AI answered in a format I could not read, so a template was used."
+        except AIError as exc:
+            return fallback_panel(role_names), f"AI unavailable: {exc} — a template was used instead."
+
+    @staticmethod
+    def _parse_panel(raw, role_names):
+        try:
+            obj = json.loads(raw)
+        except ValueError:
+            m = re.search(r"\{.*\}", raw, re.S)
+            try:
+                obj = json.loads(m.group(0)) if m else None
+            except ValueError:
+                obj = None
+        if not isinstance(obj, dict) or not obj.get("title") or len(str(obj.get("description") or "")) < 30:
+            return None
+        by_name = {str(r.get("name", "")).lower(): r for r in (obj.get("roles") or []) if isinstance(r, dict)}
+        roles = []
+        for i, name in enumerate(role_names):
+            r = by_name.get(name.lower(), {})
+            emoji = str(r.get("emoji") or "").strip("{}: ").lower()
+            roles.append({"name": name, "emoji": emoji if emoji in icons.ICONS else PANEL_ICONS[i % len(PANEL_ICONS)],
+                          "blurb": str(r.get("blurb") or f"Get the {name} role")[:70]})
+        return {"title": str(obj["title"])[:120], "description": str(obj["description"])[:900], "roles": roles}
+
     @staticmethod
     def _parse_embed(raw):
         obj = None
@@ -245,6 +292,15 @@ class AI:
                                "inline": bool(f.get("inline", True))})
         return {"title": title[:256], "description": desc[:3800], "fields": fields,
                 "footer": str(obj.get("footer") or "")[:60]}
+
+
+PANEL_ICONS = ["bell", "star", "gift", "megaphone", "rocket", "members", "diamond", "fire", "shield", "bolt"]
+
+
+def fallback_panel(role_names):
+    return {"title": "{star} Pick Your Roles",
+            "description": "{bell} Choose the roles you want below!\n{rocket} Click a button to **get** a role, click again to **remove** it.",
+            "roles": [{"name": n, "emoji": PANEL_ICONS[i % len(PANEL_ICONS)], "blurb": f"Get the {n} role"} for i, n in enumerate(role_names)]}
 
 
 def fallback_embed(kind, brief):

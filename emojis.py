@@ -56,6 +56,9 @@ class EmojiManager:
     def has(self, guild):
         return self._find("rocket", guild) is not None
 
+    def complete(self, guild):
+        return all(self._find(n, guild) is not None for n in icons.ICONS)
+
 
 async def install_emojis(bot, guild, overwrite=False, progress=None):
     """Draw + upload every icon. Returns (created, skipped, failed[(name, reason)])."""
@@ -119,7 +122,7 @@ class EmojiCog(commands.Cog, name="Emojis"):
             await self._auto_install(guild)
 
     async def _auto_install(self, guild):
-        if self.bot.emo.has(guild) or guild.id in self._installing:
+        if self.bot.emo.complete(guild) or guild.id in self._installing:
             return
         if not guild.me.guild_permissions.manage_expressions:
             print(f"[emoji] {guild.name}: missing Manage Expressions, skipping auto-install")
