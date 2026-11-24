@@ -1,5 +1,6 @@
 """Hosting-business features: plans showcase with Order button, payment methods, vouches, customer role, TOS, status helpers.
 Plans are also written to data/plans_kb.md so the ticket AI quotes your REAL prices."""
+import json
 import os
 from typing import Optional
 
@@ -60,23 +61,40 @@ class Hosting(commands.Cog, name="Hosting"):
     async def _plans(self, gid):
         return await self.bot.db.get(gid, "plans", [])
 
+    CATS = {
+        "minecraft": ("Minecraft Hosting", "rocket", "{rocket} **Lag-free Minecraft servers** • Paper, Spigot, Forge, Fabric, Bedrock\n"),
+        "vps": ("VPS Hosting", "server", "{server} **Full root access VPS** • NVMe storage • DDoS protected\n"),
+        "perks": ("Invite & Booster Perks", "gift", "{gift} **Free rewards** for helping the community grow!\n"),
+    }
+    CAT_CHOICES = [app_commands.Choice(name="Minecraft", value="minecraft"), app_commands.Choice(name="VPS", value="vps"),
+                   app_commands.Choice(name="Invite & Booster perks", value="perks")]
+
     def _write_kb(self, plans):
         os.makedirs("data", exist_ok=True)
         lines = ["## LIVE PLANS (official, set by staff — always quote these exactly)"]
-        lines += [f"- {p['name']}: {p['specs']} — {p['price']}" for p in plans] or ["- (no plans published yet)"]
+        for key, (label, _, _) in self.CATS.items():
+            items = [p for p in plans if p.get("category", "vps") == key]
+            if items:
+                lines.append(f"### {label}")
+                lines += [f"- {p['name']}: {p['specs']} — {p['price']}" for p in items]
+        if len(lines) == 1:
+            lines.append("- (no plans published yet)")
         with open(PLANS_KB, "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines))
 
-    @plans.command(name="add", description="Add or update a plan")
-    @app_commands.describe(name="Plan name", price="e.g. ₹199/month", specs="e.g. 4GB RAM • 2 vCPU • 40GB NVMe", emoji="Emoji name, e.g. diamond")
-    async def plan_add(self, interaction: discord.Interaction, name: str, price: str, specs: str, emoji: str = "diamond"):
+    @plans.command(name="add", description="Add or update a plan / perk")
+    @app_commands.describe(category="Minecraft, VPS or perks", name="Plan name", price="e.g. ₹199/month (perks: e.g. 5 invites)",
+                           specs="e.g. 4GB RAM • 2 vCPU • 40GB NVMe", emoji="Emoji name, e.g. diamond")
+    @app_commands.choices(category=CAT_CHOICES)
+    async def plan_add(self, interaction: discord.Interaction, category: app_commands.Choice[str], name: str, price: str, specs: str,
+                       emoji: str = "diamond"):
         g = interaction.guild
-        plans = [p for p in await self._plans(g.id) if p["name"].lower() != name.lower()]
-        plans.append({"name": name[:40], "price": price[:40], "specs": specs[:150], "emoji": emoji.strip("{}:")[:20]})
+        plans = [p for p in await self._plans(g.id) if not (p["name"].lower() == name.lower() and p.get("category") == category.value)]
+        plans.append({"category": category.value, "name": name[:40], "price": price[:60], "specs": specs[:200], "emoji": emoji.strip("{}:")[:20]})
         await self.bot.db.set(g.id, "plans", plans)
         self._write_kb(plans)
         await interaction.response.send_message(embed=brand.embed(
-            self.bot, "ok", "Plan saved", f"**{name}** — {price}\n{specs}\nThe ticket AI now knows this plan.", guild=g), ephemeral=True)
+            self.bot, "ok", "Saved", f"**{name}** ({category.name}) — {price}\n{specs}\nThe ticket AI now knows this.", guild=g), ephemeral=True)
 
     @plans.command(name="remove", description="Remove a plan")
     async def plan_remove(self, interaction: discord.Interaction, name: str):
@@ -88,32 +106,72 @@ class Hosting(commands.Cog, name="Hosting"):
         await interaction.response.send_message(embed=brand.embed(
             self.bot, "ok" if len(plans) < len(old) else "err", "Removed" if len(plans) < len(old) else "Not found", name, guild=g), ephemeral=True)
 
-    @plans.command(name="post", description="Post the plans embed with an Order button")
-    async def plan_post(self, interaction: discord.Interaction, channel: Optional[discord.TextChannel] = None):
+    def _cat_embed(self, g, key, plans):
+        label, icon, intro = self.CATS[key]
+        items = [p for p in plans if p.get("category", "vps") == key]
+        fields = [(f"{{{p['emoji']}}} {p['name']}", f"{p['specs']}\n**{p['price']}**", True) for p in items[:24]]
+        tail = {"minecraft": "{shield} DDoS protected • {bolt} NVMe • {support} 24/7 support\n{ticket} Press **Order now** to open a ticket!",
+                "vps": "{shield} DDoS protected • {bolt} NVMe • {support} 24/7 support\n{ticket} Press **Order now** to open a ticket!",
+                "perks": "{members} Invite friends with `/invites` • {diamond} Boost the server to unlock more\n{ticket} Open a ticket to claim your reward!"}[key]
+        em = brand.embed(self.bot, "premium", f"{brand.NAME} • {label}", f"{intro}{brand.LINE}\n{tail}", guild=g, fields=fields)
+        em.color = {"minecraft": 0x22C55E, "vps": 0x3B82F6, "perks": 0xEC4899}[key]
+        return em, bool(items)
+
+    @plans.command(name="post", description="Post plan embeds (Minecraft, VPS, perks) to a channel")
+    @app_commands.describe(category="Which one to post (default: all)", channel="Where to post")
+    @app_commands.choices(category=[app_commands.Choice(name="All", value="all")] + CAT_CHOICES)
+    async def plan_post(self, interaction: discord.Interaction, category: Optional[app_commands.Choice[str]] = None,
+                        channel: Optional[discord.TextChannel] = None):
         g = interaction.guild
         plans = await self._plans(g.id)
+        keys = list(self.CATS) if not category or category.value == "all" else [category.value]
+        ch = channel or interaction.channel
+        await interaction.response.defer(ephemeral=True)
+        posted, missing = 0, []
+        self._write_kb(plans)
+        for key in keys:
+            em, has = self._cat_embed(g, key, plans)
+            if not has:
+                missing.append(self.CATS[key][0])
+                continue
+            try:
+                await ch.send(embed=em, view=OrderView(self.bot, g) if key != "perks" else None)
+                posted += 1
+            except discord.HTTPException as exc:
+                return await interaction.followup.send(embed=brand.embed(self.bot, "err", "Could not post", exc.text, guild=g), ephemeral=True)
+        note = f"\nNo items yet for: {', '.join(missing)} (add with `/plans add` or `/plans load-defaults`)." if missing else ""
+        await interaction.followup.send(embed=brand.embed(
+            self.bot, "ok" if posted else "err", "Posted" if posted else "Nothing to post", f"{posted} embed(s) sent to {ch.mention}.{note}", guild=g), ephemeral=True)
+
+    @plans.command(name="load-defaults", description="Load the built-in AxionHost plans from plans_seed.json")
+    async def plan_defaults(self, interaction: discord.Interaction):
+        g = interaction.guild
+        try:
+            with open("plans_seed.json", "r", encoding="utf-8") as fh:
+                seed = json.load(fh)
+        except (OSError, ValueError) as exc:
+            return await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Cannot read plans_seed.json", str(exc), guild=g), ephemeral=True)
+        plans = [p for p in seed if isinstance(p, dict) and p.get("name") and p.get("category") in self.CATS]
         if not plans:
             return await interaction.response.send_message(embed=brand.embed(
-                self.bot, "err", "No plans", "Add some with `/plans add` first.", guild=g), ephemeral=True)
-        fields = [(f"{{{p['emoji']}}} {p['name']}", f"{p['specs']}\n**{p['price']}**", True) for p in plans[:24]]
-        em = brand.embed(self.bot, "premium", f"{brand.NAME} Plans",
-                         f"{{rocket}} **Fast. Secure. Premium.**\n{brand.LINE}\n{{shield}} DDoS protected • {{bolt}} NVMe • {{support}} 24/7 support\n{brand.LINE}",
-                         guild=g, fields=fields)
+                self.bot, "err", "Seed is empty", "plans_seed.json has no plans yet.", guild=g), ephemeral=True)
+        for p in plans:
+            p.setdefault("emoji", "diamond")
+        await self.bot.db.set(g.id, "plans", plans)
         self._write_kb(plans)
-        try:
-            msg = await (channel or interaction.channel).send(embed=em, view=OrderView(self.bot, g))
-        except discord.HTTPException as exc:
-            return await interaction.response.send_message(embed=brand.embed(self.bot, "err", "Could not post", exc.text, guild=g), ephemeral=True)
-        await interaction.response.send_message(embed=brand.embed(self.bot, "ok", "Plans posted", msg.jump_url, guild=g), ephemeral=True)
+        await interaction.response.send_message(embed=brand.embed(
+            self.bot, "ok", "Plans loaded", f"Loaded **{len(plans)}** items. Now run `/plans post` in the channel you want.", guild=g), ephemeral=True)
 
     @app_commands.command(name="plans-list", description="See our hosting plans")
     @app_commands.guild_only()
     async def plans_list(self, interaction: discord.Interaction):
         g = interaction.guild
         plans = await self._plans(g.id)
-        fields = [(f"{{{p['emoji']}}} {p['name']}", f"{p['specs']}\n**{p['price']}**", True) for p in plans[:24]]
-        await interaction.response.send_message(embed=brand.embed(
-            self.bot, "premium", f"{brand.NAME} Plans", "Open a ticket to order!" if plans else "Plans coming soon.", guild=g, fields=fields))
+        embeds = [self._cat_embed(g, k, plans)[0] for k in self.CATS if self._cat_embed(g, k, plans)[1]]
+        if not embeds:
+            return await interaction.response.send_message(embed=brand.embed(self.bot, "info", "Plans", "Plans coming soon.", guild=g))
+        await interaction.response.send_message(embeds=embeds[:3])
 
     # ================================================================== payments / tos / customer role / vouch channel
     @host.command(name="payments", description="Set the payment-methods text, e.g. UPI id, crypto addresses")
