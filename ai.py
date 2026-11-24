@@ -133,9 +133,9 @@ class AI:
                 if status != 400:                              # 400 = this request shape was not accepted, try the simpler one
                     break
         if status in (401, 403):
-            raise AIError("Meta AI rejected the API key. Check META_API_KEY (just the key: no spaces, quotes or 'Bearer') and restart the bot.")
+            raise AIError(f"Meta AI rejected the API key (HTTP {status}). Meta's own message: {raw[:300] or '(empty)'}")
         if status == 404:
-            raise AIError(f"Meta AI says model/endpoint not found. Check META_MODEL (`{self.meta_model}`) and META_API_URL (`{endpoint}`).")
+            raise AIError(f"Meta AI says model/endpoint not found (HTTP 404). Model `{self.meta_model}`, URL `{endpoint}`. Meta's own message: {raw[:300] or '(empty)'}")
         if status == 429:
             raise AIError("Meta AI rate limit reached. Wait a little or check your plan/credits.")
         if status != 200:
