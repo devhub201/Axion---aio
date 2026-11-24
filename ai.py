@@ -48,7 +48,11 @@ class AI:
         self.timeout = float(os.getenv("OLLAMA_TIMEOUT", "180"))
         self.default_lang = os.getenv("AI_LANG", "hinglish")
         self.kb_path = os.getenv("KB_PATH", "kb.md")
-        self.meta_key = os.getenv("META_API_KEY", "").strip()
+        raw_key = os.getenv("META_API_KEY", "")
+        self.meta_key = raw_key.strip().strip("\"'").strip()               # forgive stray quotes/spaces
+        if self.meta_key.lower().startswith("bearer "):
+            self.meta_key = self.meta_key[7:].strip()                    # forgive a pasted "Bearer " prefix
+        self.key_note = "" if raw_key == self.meta_key else " (cleaned: removed spaces/quotes/Bearer)"
         self.meta_url = os.getenv("META_API_URL", "https://api.meta.ai/v1/responses").rstrip("/")
         self.meta_model = os.getenv("META_MODEL", "muse-wonder-1.0")
         self.provider = "meta" if self.meta_key else "ollama"          # a Meta key in .env switches the AI to Meta
@@ -555,6 +559,9 @@ class AICog(commands.Cog, name="AI"):
                   ("Model", f"`{self.bot.ai.meta_model if meta else self.bot.ai.model}`", True),
                   ("Reachable", "{online} yes" if h["reachable"] else "{offline} no", True),
                   ("Model ready", "{check} yes" if h["model_ready"] else "{cross} no", True)]
+        if meta:
+            k = self.bot.ai.meta_key
+            fields.append(("API key seen by bot", f"{len(k)} characters, ends with `{k[-4:]}`{self.bot.ai.key_note}", False))
         if h["latency"] is not None:
             fields.append(("Reply time", f"{h['latency']:.1f}s", True))
         if h["models"]:
