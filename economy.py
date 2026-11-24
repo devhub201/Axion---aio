@@ -190,7 +190,7 @@ class Economy(commands.Cog, name="Economy"):
             self.bot, "ok", "Purchased!", f"{{check}} You bought **{item['name']}** for {item['price']:,} {CUR}.", guild=g))
 
     @shop.command(name="add", description="Add a role item to the shop (admin)")
-    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def shop_add(self, interaction: discord.Interaction, name: str, price: app_commands.Range[int, 1, 10000000], role: discord.Role,
                        description: str = ""):
         g = interaction.guild
@@ -204,7 +204,7 @@ class Economy(commands.Cog, name="Economy"):
         await interaction.response.send_message(embed=brand.embed(self.bot, "ok", "Item added", f"**{name}** — {price:,} {CUR}", guild=g), ephemeral=True)
 
     @shop.command(name="remove", description="Remove a shop item (admin)")
-    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def shop_remove(self, interaction: discord.Interaction, name: str):
         n = await self.bot.db.rowcount("DELETE FROM shop WHERE guild_id=? AND LOWER(name)=LOWER(?)", (interaction.guild.id, name))
         await interaction.response.send_message(embed=brand.embed(

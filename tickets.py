@@ -91,6 +91,7 @@ class TicketControls(discord.ui.View):
         self.claim_btn.emoji = emo.partial("crown", guild)
         self.human_btn.emoji = emo.partial("members", guild)
         self.transcript_btn.emoji = emo.partial("billing", guild)
+        self.paid_btn.emoji = emo.partial("money", guild)
 
     @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, custom_id="ax:tkt:close")
     async def close_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -103,6 +104,13 @@ class TicketControls(discord.ui.View):
     @discord.ui.button(label="Talk to Staff", style=discord.ButtonStyle.primary, custom_id="ax:tkt:human")
     async def human_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.talk_to_staff(interaction)
+
+    @discord.ui.button(label="Mark Paid", style=discord.ButtonStyle.success, custom_id="ax:tkt:paid", row=1)
+    async def paid_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        hosting = self.cog.bot.get_cog("Hosting")
+        if hosting is None:
+            return await interaction.response.send_message("Payments module is not loaded.", ephemeral=True)
+        await hosting.open_paid_modal(interaction)
 
     @discord.ui.button(label="Transcript", style=discord.ButtonStyle.secondary, custom_id="ax:tkt:transcript")
     async def transcript_btn(self, interaction: discord.Interaction, button: discord.ui.Button):

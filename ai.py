@@ -15,7 +15,7 @@ import brand
 import icons
 
 ESCALATE = "[[ESCALATE]]"
-AI_FOOTER = f"{brand.NAME} AI • self-hosted"
+AI_FOOTER = f"{brand.NAME} AI"
 
 KINDS = {
     "announcement": ("{megaphone}", "big news for the whole community; exciting and clear"),
@@ -47,6 +47,10 @@ class AI:
         self.timeout = float(os.getenv("OLLAMA_TIMEOUT", "180"))
         self.default_lang = os.getenv("AI_LANG", "hinglish")
         self.kb_path = os.getenv("KB_PATH", "kb.md")
+        self.meta_key = os.getenv("META_API_KEY", "").strip()
+        self.meta_url = os.getenv("META_API_URL", "https://api.llama.com/compat/v1").rstrip("/")
+        self.meta_model = os.getenv("META_MODEL", "Llama-3.3-70B-Instruct")
+        self.provider = "meta" if self.meta_key else "ollama"          # a Meta key in .env switches the AI to Meta
         self.token = os.getenv("OLLAMA_TOKEN", "").strip()      # optional: for a reverse proxy in front of a remote Ollama
         self._sem = asyncio.Semaphore(int(os.getenv("AI_CONCURRENCY", "1")))
         self._session: Optional[aiohttp.ClientSession] = None
@@ -87,7 +91,56 @@ class AI:
             self._kb_cache = ("\n\n".join(parts)[:7000], stamp)
         return self._kb_cache[0]
 
+    @property
+    def label(self):
+        return f"Meta • {self.meta_model}" if self.provider == "meta" else f"Ollama • {self.model}"
+
     async def chat(self, messages, *, json_mode=False, temperature=0.7, max_tokens=450):
+        if self.provider == "meta":
+            return await self._chat_meta(messages, json_mode, temperature, max_tokens)
+        return await self._chat_ollama(messages, json_mode=json_mode, temperature=temperature, max_tokens=max_tokens)
+
+    async def _chat_meta(self, messages, json_mode, temperature, max_tokens):
+        body = {"model": self.meta_model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
+        headers = {"Authorization": f"Bearer {self.meta_key}", "Content-Type": "application/json"}
+        async with self._sem:
+            for attempt in (1, 2):
+                try:
+                    async with self.session.post(f"{self.meta_url}/chat/completions", json=body, headers=headers,
+                                                 timeout=aiohttp.ClientTimeout(total=min(self.timeout, 90))) as resp:
+                        raw = await resp.text()
+                        status = resp.status
+                except asyncio.TimeoutError:
+                    raise AIError("Meta AI took too long to answer. Try again in a moment.")
+                except aiohttp.ClientError as exc:
+                    raise AIError(f"Could not reach Meta AI at {self.meta_url}: {exc}")
+                if status == 400 and "response_format" in body:       # model/endpoint without JSON mode: our prompts still ask for JSON
+                    body.pop("response_format")
+                    continue
+                break
+        if status in (401, 403):
+            raise AIError("Meta AI rejected the API key. Check META_API_KEY in .env (no spaces, not expired).")
+        if status == 404:
+            raise AIError(f"Meta AI says model/endpoint not found. Check META_MODEL (`{self.meta_model}`) and META_API_URL.")
+        if status == 429:
+            raise AIError("Meta AI rate limit reached. Wait a little or check your plan/credits.")
+        if status != 200:
+            raise AIError(f"Meta AI returned HTTP {status}: {raw[:200]}")
+        try:
+            data = json.loads(raw)
+            msg = data["choices"][0]["message"]["content"]
+            if isinstance(msg, list):                                  # some APIs return content parts
+                msg = "".join(p.get("text", "") for p in msg if isinstance(p, dict))
+            text = (msg or "").strip()
+        except (ValueError, KeyError, IndexError, TypeError):
+            raise AIError("Meta AI sent a reply I could not read. Check META_API_URL points to the OpenAI-compatible endpoint.")
+        if not text:
+            raise AIError("Meta AI returned an empty answer.")
+        return text
+
+    async def _chat_ollama(self, messages, *, json_mode=False, temperature=0.7, max_tokens=450):
         payload = {
             "model": self.model, "messages": messages, "stream": False, "keep_alive": "30m",
             "options": {"temperature": temperature, "num_predict": max_tokens, "num_ctx": 4096},
@@ -117,6 +170,16 @@ class AI:
 
     async def health(self):
         out = {"reachable": False, "model_ready": False, "models": [], "error": None, "latency": None}
+        if self.provider == "meta":
+            t0 = time.monotonic()
+            try:
+                await self.chat([{"role": "user", "content": "Reply with the single word: ready"}], max_tokens=5)
+            except AIError as exc:
+                out["error"] = str(exc)
+                out["reachable"] = "rejected" in str(exc) or "not found" in str(exc) or "rate limit" in str(exc)
+                return out
+            out.update(reachable=True, model_ready=True, models=[self.meta_model], latency=time.monotonic() - t0)
+            return out
         try:
             async with self.session.get(f"{self.url}/api/tags", timeout=aiohttp.ClientTimeout(total=8)) as resp:
                 if resp.status != 200:
@@ -482,14 +545,17 @@ class AICog(commands.Cog, name="AI"):
         h = await self.bot.ai.health()
         g = interaction.guild
         ok = h["reachable"] and h["model_ready"] and not h["error"]
-        fields = [("Server", f"`{self.bot.ai.url}`", False), ("Model", f"`{self.bot.ai.model}`", True),
+        meta = self.bot.ai.provider == "meta"
+        fields = [("Provider", "Meta AI (API)" if meta else "Ollama (your VPS)", False),
+                  ("Server", f"`{self.bot.ai.meta_url if meta else self.bot.ai.url}`", False),
+                  ("Model", f"`{self.bot.ai.meta_model if meta else self.bot.ai.model}`", True),
                   ("Reachable", "{online} yes" if h["reachable"] else "{offline} no", True),
                   ("Model ready", "{check} yes" if h["model_ready"] else "{cross} no", True)]
         if h["latency"] is not None:
             fields.append(("Reply time", f"{h['latency']:.1f}s", True))
         if h["models"]:
             fields.append(("Installed models", ", ".join(f"`{m}`" for m in h["models"][:10]), False))
-        desc = "Everything is running on your own VPS." if ok else f"**Problem:** {h['error']}"
+        desc = ("Meta AI is connected." if meta else "Everything is running on your own VPS.") if ok else f"**Problem:** {h['error']}"
         await interaction.followup.send(embed=brand.embed(self.bot, "ok" if ok else "err", "AI status", desc,
                                                           guild=g, fields=fields), ephemeral=True)
 

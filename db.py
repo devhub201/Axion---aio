@@ -73,6 +73,12 @@ CREATE TABLE IF NOT EXISTS polls(
 CREATE TABLE IF NOT EXISTS poll_votes(message_id INTEGER, user_id INTEGER, choice INTEGER, PRIMARY KEY(message_id, user_id));
 
 CREATE TABLE IF NOT EXISTS starred(message_id INTEGER PRIMARY KEY, guild_id INTEGER, board_msg_id INTEGER);
+
+CREATE TABLE IF NOT EXISTS birthdays(guild_id INTEGER, user_id INTEGER, month INTEGER, day INTEGER, PRIMARY KEY(guild_id, user_id));
+
+CREATE TABLE IF NOT EXISTS payments(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, ticket_id INTEGER, user_id INTEGER, staff_id INTEGER,
+    plan TEXT, amount REAL, method TEXT, created_at REAL);
 """
 
 
@@ -85,10 +91,14 @@ class Database:
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.executescript(SCHEMA)
-            try:
-                self._conn.execute("ALTER TABLE tickets ADD COLUMN rating INTEGER")
-            except sqlite3.OperationalError:
-                pass                                  # column already exists
+            for stmt in ("ALTER TABLE tickets ADD COLUMN rating INTEGER",
+                         "ALTER TABLE giveaways ADD COLUMN req_role INTEGER",
+                         "ALTER TABLE giveaways ADD COLUMN req_invites INTEGER",
+                         "ALTER TABLE giveaways ADD COLUMN req_level INTEGER"):
+                try:
+                    self._conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass                              # column already exists
             self._conn.commit()
 
     # -- raw helpers ---------------------------------------------------------

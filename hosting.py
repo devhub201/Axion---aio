@@ -3,6 +3,7 @@ Plans are also written to data/plans_kb.md so the ticket AI quotes your REAL pri
 import json
 import os
 import re
+import time
 from typing import Optional
 
 import discord
@@ -13,7 +14,7 @@ import brand
 import tickets
 
 PLANS_KB = os.path.join("data", "plans_kb.md")
-HOST_DEFAULTS = {"vouch_channel_id": None, "customer_role_id": None, "payments": None, "tos": None}
+HOST_DEFAULTS = {"vouch_channel_id": None, "customer_role_id": None, "payments": None, "tos": None, "payment_log_id": None}
 
 
 class OrderView(discord.ui.View):
@@ -41,6 +42,19 @@ class ClaimView(discord.ui.View):
     @discord.ui.button(label="Claim reward", style=discord.ButtonStyle.primary, custom_id="ax:claim")
     async def claim_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(tickets.TicketModal(self.bot.get_cog("Tickets"), "rewards"))
+
+
+class PaidModal(discord.ui.Modal, title="Confirm payment"):
+    plan = discord.ui.TextInput(label="Plan bought", placeholder="e.g. Ryzen Minecraft GOLD", max_length=80)
+    amount = discord.ui.TextInput(label="Amount received (INR)", placeholder="384", max_length=12)
+    method = discord.ui.TextInput(label="Payment method", default="UPI", max_length=30)
+
+    def __init__(self, cog):
+        super().__init__()
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.confirm_payment(interaction, str(self.plan), str(self.amount), str(self.method))
 
 
 class VouchModal(discord.ui.Modal, title="Leave a vouch"):
@@ -232,6 +246,113 @@ class Hosting(commands.Cog, name="Hosting"):
         await interaction.response.send_message(embed=brand.embed(
             self.bot, "premium", "Welcome, customer!", f"{{crown}} {member.mention} is now an **{brand.NAME} customer**"
             + (f" on **{plan}**" if plan else "") + f"!\nThank you for trusting us {{diamond}}\nLeave a review with `/vouch`.{note}", guild=g))
+
+    # ================================================================== payment confirmation
+    async def _paid_context(self, interaction):
+        """Returns the open ticket row if the caller is staff inside a ticket, else answers with an error and returns None."""
+        if not interaction.guild or not isinstance(interaction.user, discord.Member) or not await brand.is_staff(self.bot, interaction.user):
+            await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Staff only", "Only staff can confirm payments.", guild=interaction.guild), ephemeral=True)
+            return None
+        row = await self.bot.get_cog("Tickets").get_ticket(interaction.channel.id)
+        if not row:
+            await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Not a ticket", "Use this inside the customer's open ticket.", guild=interaction.guild), ephemeral=True)
+            return None
+        return row
+
+    async def open_paid_modal(self, interaction):
+        if await self._paid_context(interaction):
+            await interaction.response.send_modal(PaidModal(self))
+
+    @app_commands.command(name="paid", description="Staff: confirm a payment in this ticket and give the customer role")
+    @app_commands.default_permissions(manage_messages=True)
+    @app_commands.guild_only()
+    async def paid(self, interaction: discord.Interaction, plan: str, amount: str, method: str = "UPI"):
+        if await self._paid_context(interaction):
+            await self.confirm_payment(interaction, plan, amount, method)
+
+    async def confirm_payment(self, interaction, plan, amount_text, method):
+        g = interaction.guild
+        row = await self._paid_context_quiet(interaction)
+        if not row:
+            return await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Not a ticket", "This channel is not an open ticket anymore.", guild=g), ephemeral=True)
+        digits = re.sub(r"[^\d.]", "", amount_text)
+        try:
+            amount = float(digits)
+            assert amount > 0
+        except (ValueError, AssertionError):
+            return await interaction.response.send_message(embed=brand.embed(
+                self.bot, "err", "Bad amount", "Enter the amount as a number, e.g. `384`.", guild=g), ephemeral=True)
+        member = g.get_member(row["user_id"])
+        pid = await self.bot.db.execute(
+            "INSERT INTO payments(guild_id,ticket_id,user_id,staff_id,plan,amount,method,created_at) VALUES(?,?,?,?,?,?,?,?)",
+            (g.id, row["id"], row["user_id"], interaction.user.id, plan[:80], amount, method[:30] or "UPI", time.time()))
+        cfg = await self.cfg(g.id)
+        role = g.get_role(cfg["customer_role_id"]) if cfg["customer_role_id"] else None
+        notes = []
+        if role and member:
+            try:
+                await member.add_roles(role, reason=f"Payment #{pid} confirmed by {interaction.user}")
+            except discord.HTTPException as exc:
+                notes.append(f"⚠️ Could not give {role.mention}: {exc.text} (my role must be above it).")
+        elif not role:
+            notes.append("Tip: set the customer role with `/host customer-role` so buyers get it automatically.")
+        shown = f"₹{amount:,.0f}" if amount == int(amount) else f"₹{amount:,.2f}"
+        receipt = brand.embed(self.bot, "ok", f"Payment confirmed • #{pid:04d}",
+                              f"{{check}} Thank you <@{row['user_id']}>! Your payment has been received and confirmed.\n"
+                              f"{brand.LINE}\n{{rocket}} Our team will now set up your service.\n{{star}} Loved it? Leave a review with `/vouch`.",
+                              guild=g, fields=[("{members} Customer", f"<@{row['user_id']}>", True), ("{diamond} Plan", plan[:80], True),
+                                               ("{money} Amount", shown, True), ("{billing} Method", method[:30] or "UPI", True),
+                                               ("{crown} Confirmed by", interaction.user.mention, True), ("{ticket} Ticket", f"#{row['id']:04d}", True)])
+        await interaction.response.send_message("✅ Payment recorded.", ephemeral=True)
+        try:
+            await interaction.channel.send(content=f"<@{row['user_id']}>", embed=receipt,
+                                           allowed_mentions=discord.AllowedMentions(users=True))
+        except discord.HTTPException as exc:
+            notes.append(f"Could not post the receipt here: {exc.text}")
+        if member:
+            try:
+                await member.send(embed=receipt)
+            except discord.HTTPException:
+                pass                                              # DMs closed
+        log = g.get_channel(cfg["payment_log_id"]) if cfg["payment_log_id"] else None
+        if log:
+            try:
+                await log.send(embed=receipt)
+            except discord.HTTPException as exc:
+                notes.append(f"Could not post in the payment log: {exc.text}")
+        else:
+            await brand.send_log(self.bot, g, receipt)
+        if notes:
+            await interaction.followup.send("\n".join(notes), ephemeral=True)
+
+    async def _paid_context_quiet(self, interaction):
+        return await self.bot.get_cog("Tickets").get_ticket(interaction.channel.id)
+
+    @host.command(name="payment-log", description="Channel where payment receipts are logged")
+    async def host_payment_log(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        await self.bot.db.cfg_set(interaction.guild.id, "host", HOST_DEFAULTS, payment_log_id=channel.id)
+        await interaction.response.send_message(embed=brand.embed(self.bot, "ok", "Payment log set", channel.mention, guild=interaction.guild), ephemeral=True)
+
+    @app_commands.command(name="revenue", description="Staff: income summary from confirmed payments")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def revenue(self, interaction: discord.Interaction):
+        g, db = interaction.guild, self.bot.db
+        tot = await db.fetchone("SELECT COUNT(*) c, COALESCE(SUM(amount),0) s FROM payments WHERE guild_id=?", (g.id,))
+        mon = await db.fetchone("SELECT COUNT(*) c, COALESCE(SUM(amount),0) s FROM payments WHERE guild_id=? AND "
+                                "strftime('%Y-%m', created_at, 'unixepoch', '+5 hours', '+30 minutes') = strftime('%Y-%m', 'now', '+5 hours', '+30 minutes')", (g.id,))
+        by = await db.fetchall("SELECT method, COUNT(*) c, SUM(amount) s FROM payments WHERE guild_id=? GROUP BY method ORDER BY s DESC LIMIT 5", (g.id,))
+        top = await db.fetchall("SELECT plan, COUNT(*) c FROM payments WHERE guild_id=? GROUP BY plan ORDER BY c DESC LIMIT 3", (g.id,))
+        methods = "\n".join(f"• {r['method']}: ₹{r['s']:,.0f} ({r['c']})" for r in by) or "—"
+        plans = "\n".join(f"• {r['plan']}: {r['c']} sold" for r in top) or "—"
+        await interaction.response.send_message(embed=brand.embed(
+            self.bot, "premium", "Revenue", None, guild=g, fields=[
+                ("{money} All time", f"₹{tot['s']:,.0f}\n{tot['c']} payment(s)", True),
+                ("{stats} This month (IST)", f"₹{mon['s']:,.0f}\n{mon['c']} payment(s)", True),
+                ("{billing} By method", methods, False), ("{diamond} Best sellers", plans, False)]), ephemeral=True)
 
     # ================================================================== vouches
     @app_commands.command(name="vouch", description="Leave a review for the service")

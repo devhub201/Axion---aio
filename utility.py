@@ -342,7 +342,7 @@ class Utility(commands.Cog, name="Utility"):
 
     # ================================================================== suggestions
     @suggestion.command(name="channel", description="Set the suggestions channel (admin)")
-    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def sg_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         await self.bot.db.cfg_set(interaction.guild.id, "suggest", SUGGEST_DEFAULTS, channel_id=channel.id)
         await interaction.response.send_message(embed=brand.embed(

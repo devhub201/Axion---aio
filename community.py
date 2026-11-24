@@ -62,6 +62,11 @@ class GiveawayView(discord.ui.View):
                 self.bot, "err", "Giveaway ended", "This giveaway is over.", guild=g), ephemeral=True)
         had = await db.fetchone("SELECT 1 x FROM giveaway_entries WHERE giveaway_id=? AND user_id=?",
                                 (row["id"], interaction.user.id))
+        if not had:
+            missing = await self.bot.get_cog("Community").missing_reqs(interaction.user, row)
+            if missing:
+                return await interaction.response.send_message(embed=brand.embed(
+                    self.bot, "err", "Requirements not met", "\n".join(missing), guild=g), ephemeral=True)
         if had:
             await db.execute("DELETE FROM giveaway_entries WHERE giveaway_id=? AND user_id=?", (row["id"], interaction.user.id))
             msg = "You left the giveaway."
@@ -337,8 +342,12 @@ class Community(commands.Cog, name="Community"):
     @giveaway.command(name="start", description="Start a giveaway")
     @app_commands.describe(prize="What you are giving away", duration="e.g. 30m, 2h, 1d", winners="How many winners",
                            channel="Where to post (default: here)")
+    @app_commands.describe(require_role="Only members with this role can enter", min_invites="Minimum invites needed to enter",
+                           min_level="Minimum XP level needed to enter")
     async def gw_start(self, interaction: discord.Interaction, prize: str, duration: str,
-                       winners: app_commands.Range[int, 1, 20] = 1, channel: Optional[discord.TextChannel] = None):
+                       winners: app_commands.Range[int, 1, 20] = 1, channel: Optional[discord.TextChannel] = None,
+                       require_role: Optional[discord.Role] = None, min_invites: Optional[app_commands.Range[int, 1, 500]] = None,
+                       min_level: Optional[app_commands.Range[int, 1, 200]] = None):
         g = interaction.guild
         secs = brand.parse_duration(duration)
         if not secs or secs > 30 * 86400:
@@ -346,19 +355,28 @@ class Community(commands.Cog, name="Community"):
                 self.bot, "err", "Bad duration", "Use something like `30m`, `2h`, `1d` (max 30 days).", guild=g), ephemeral=True)
         ch = channel or interaction.channel
         ends = time.time() + secs
-        em = self._gw_embed(g, prize, winners, ends, interaction.user.id)
+        reqs = []
+        if require_role:
+            reqs.append(f"{{shield}} Role: {require_role.mention}")
+        if min_invites:
+            reqs.append(f"{{members}} Invites: **{min_invites}+**")
+        if min_level:
+            reqs.append(f"{{star}} Level: **{min_level}+**")
+        em = self._gw_embed(g, prize, winners, ends, interaction.user.id, reqs=reqs)
         try:
             msg = await ch.send(embed=em, view=GiveawayView(self.bot, g))
         except discord.HTTPException as exc:
             return await interaction.response.send_message(embed=brand.embed(
                 self.bot, "err", "Could not post", exc.text, guild=g), ephemeral=True)
         gid = await self.bot.db.execute(
-            "INSERT INTO giveaways(guild_id,channel_id,message_id,prize,winners,ends_at,host_id) VALUES(?,?,?,?,?,?,?)",
-            (g.id, ch.id, msg.id, prize, winners, ends, interaction.user.id))
+            "INSERT INTO giveaways(guild_id,channel_id,message_id,prize,winners,ends_at,host_id,req_role,req_invites,req_level) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (g.id, ch.id, msg.id, prize, winners, ends, interaction.user.id,
+             require_role.id if require_role else None, min_invites, min_level))
         await interaction.response.send_message(embed=brand.embed(
             self.bot, "ok", "Giveaway started", f"ID `{gid}` • ends <t:{int(ends)}:R> • {msg.jump_url}", guild=g), ephemeral=True)
 
-    def _gw_embed(self, guild, prize, winners, ends, host_id, entries=None, winner_ids=None, ended=False):
+    def _gw_embed(self, guild, prize, winners, ends, host_id, entries=None, winner_ids=None, ended=False, reqs=None):
         if ended:
             who = " ".join(f"<@{w}>" for w in winner_ids) if winner_ids else "No valid entries"
             em = brand.embed(self.bot, "premium", f"GIVEAWAY ENDED • {prize}", None, guild=guild, fields=[
@@ -369,8 +387,29 @@ class Community(commands.Cog, name="Community"):
                              f"{{gift}} Press the button to enter!\n{brand.LINE}", guild=guild, fields=[
                                  ("{bell} Ends", f"<t:{int(ends)}:R>", True), ("{crown} Winners", str(winners), True),
                                  ("Hosted by", f"<@{host_id}>", True)])
+        if reqs and not ended:
+            em.add_field(name=f"{self.bot.emo.get('lock', guild)} Requirements", value=self.bot.emo.fmt("\n".join(reqs), guild), inline=False)
         em.color = 0xEC4899
         return em
+
+    async def missing_reqs(self, member, row):
+        """Human-readable list of unmet giveaway requirements (empty = may enter)."""
+        miss, g = [], member.guild
+        if row.get("req_role"):
+            role = g.get_role(row["req_role"])
+            if role and role not in member.roles:
+                miss.append(f"{self.bot.emo.get('shield', g)} You need the {role.mention} role.")
+        if row.get("req_invites"):
+            rows = await self.bot.db.fetchall("SELECT member_id FROM invites WHERE guild_id=? AND inviter_id=?", (g.id, member.id))
+            have = sum(1 for r in rows if g.get_member(r["member_id"]))
+            if have < row["req_invites"]:
+                miss.append(f"{self.bot.emo.get('members', g)} You need **{row['req_invites']}** invites (you have **{have}**). Check `/invites`.")
+        if row.get("req_level"):
+            lv = await self.bot.db.fetchone("SELECT level FROM levels WHERE guild_id=? AND user_id=?", (g.id, member.id))
+            have = lv["level"] if lv else 0
+            if have < row["req_level"]:
+                miss.append(f"{self.bot.emo.get('star', g)} You need level **{row['req_level']}** (you are level **{have}**). Check `/rank`.")
+        return miss
 
     async def _pick_winners(self, row):
         g = self.bot.get_guild(row["guild_id"])
@@ -645,6 +684,8 @@ class Community(commands.Cog, name="Community"):
                 ("{stats} Levels", "`/rank` • `/leaderboard` • `/level role|settings`", False),
                 ("{bolt} BOLTs economy", "`/daily` `/work` `/balance` `/pay` `/coinflip` `/slots` `/richest` `/shop list|buy`", False),
                 ("{members} Engage", "`/poll create` • `/suggestion new` • `/remind` • `/afk` • `/avatar` • `/8ball` • `/roll`", False),
+                ("{gift} Fun & social", "`/birthday set|upcoming|show` • counting game • giveaways with role/invite/level requirements", False),
+                ("{money} Payments (staff)", "**Mark Paid** button in tickets • `/paid` • `/revenue` • `/host payment-log`", False),
                 ("{ticket} Staff tools", "`/plans add|post` • `/embed` • `/rolepanel create` • `/sticky set` • `/responder add` • `/starboard setup` • `/tempvc setup`", False)]))
 
 
