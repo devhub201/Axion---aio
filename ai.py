@@ -132,6 +132,8 @@ class AI:
                     raise AIError(f"Could not reach Meta AI at {endpoint}: {exc}")
                 if status != 400:                              # 400 = this request shape was not accepted, try the simpler one
                     break
+        if status != 200 and "billing" in raw.lower():
+            raise AIError("Meta AI says your account has a billing issue (billing_not_configured). Add or fix the payment method in the Meta developer dashboard, then try again. The key and model are fine.")
         if status in (401, 403):
             raise AIError(f"Meta AI rejected the API key (HTTP {status}). Meta's own message: {raw[:300] or '(empty)'}")
         if status == 404:
