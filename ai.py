@@ -13,6 +13,7 @@ from discord.ext import commands
 
 import brand
 import icons
+import metaapi
 
 ESCALATE = "[[ESCALATE]]"
 AI_FOOTER = f"{brand.NAME} AI"
@@ -48,8 +49,8 @@ class AI:
         self.default_lang = os.getenv("AI_LANG", "hinglish")
         self.kb_path = os.getenv("KB_PATH", "kb.md")
         self.meta_key = os.getenv("META_API_KEY", "").strip()
-        self.meta_url = os.getenv("META_API_URL", "https://api.llama.com/compat/v1").rstrip("/")
-        self.meta_model = os.getenv("META_MODEL", "Llama-3.3-70B-Instruct")
+        self.meta_url = os.getenv("META_API_URL", "https://api.meta.ai/v1/responses").rstrip("/")
+        self.meta_model = os.getenv("META_MODEL", "muse-wonder-1.0")
         self.provider = "meta" if self.meta_key else "ollama"          # a Meta key in .env switches the AI to Meta
         self.token = os.getenv("OLLAMA_TOKEN", "").strip()      # optional: for a reverse proxy in front of a remote Ollama
         self._sem = asyncio.Semaphore(int(os.getenv("AI_CONCURRENCY", "1")))
@@ -101,43 +102,46 @@ class AI:
         return await self._chat_ollama(messages, json_mode=json_mode, temperature=temperature, max_tokens=max_tokens)
 
     async def _chat_meta(self, messages, json_mode, temperature, max_tokens):
-        body = {"model": self.meta_model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
-        if json_mode:
-            body["response_format"] = {"type": "json_object"}
         headers = {"Authorization": f"Bearer {self.meta_key}", "Content-Type": "application/json"}
+        if "/responses" in self.meta_url:                      # Meta Responses API (default)
+            attempts = [
+                {"model": self.meta_model, "input": metaapi.structured_input(messages), "stream": False,
+                 "temperature": temperature, "max_output_tokens": max_tokens},
+                {"model": self.meta_model, "input": metaapi.structured_input(messages), "stream": False},
+                {"model": self.meta_model, "input": metaapi.flat_input(messages), "stream": False},
+            ]
+            endpoint = self.meta_url
+        else:                                                  # any OpenAI chat.completions style URL
+            body = {"model": self.meta_model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+            attempts = [dict(body, response_format={"type": "json_object"}) if json_mode else body, body]
+            endpoint = self.meta_url if self.meta_url.endswith("/completions") else f"{self.meta_url}/chat/completions"
+        status, raw = 0, ""
         async with self._sem:
-            for attempt in (1, 2):
+            for body in attempts:
                 try:
-                    async with self.session.post(f"{self.meta_url}/chat/completions", json=body, headers=headers,
+                    async with self.session.post(endpoint, json=body, headers=headers,
                                                  timeout=aiohttp.ClientTimeout(total=min(self.timeout, 90))) as resp:
-                        raw = await resp.text()
-                        status = resp.status
+                        raw, status = await resp.text(), resp.status
                 except asyncio.TimeoutError:
                     raise AIError("Meta AI took too long to answer. Try again in a moment.")
                 except aiohttp.ClientError as exc:
-                    raise AIError(f"Could not reach Meta AI at {self.meta_url}: {exc}")
-                if status == 400 and "response_format" in body:       # model/endpoint without JSON mode: our prompts still ask for JSON
-                    body.pop("response_format")
-                    continue
-                break
+                    raise AIError(f"Could not reach Meta AI at {endpoint}: {exc}")
+                if status != 400:                              # 400 = this request shape was not accepted, try the simpler one
+                    break
         if status in (401, 403):
-            raise AIError("Meta AI rejected the API key. Check META_API_KEY in .env (no spaces, not expired).")
+            raise AIError("Meta AI rejected the API key. Check META_API_KEY (just the key: no spaces, quotes or 'Bearer') and restart the bot.")
         if status == 404:
-            raise AIError(f"Meta AI says model/endpoint not found. Check META_MODEL (`{self.meta_model}`) and META_API_URL.")
+            raise AIError(f"Meta AI says model/endpoint not found. Check META_MODEL (`{self.meta_model}`) and META_API_URL (`{endpoint}`).")
         if status == 429:
             raise AIError("Meta AI rate limit reached. Wait a little or check your plan/credits.")
         if status != 200:
-            raise AIError(f"Meta AI returned HTTP {status}: {raw[:200]}")
+            raise AIError(f"Meta AI returned HTTP {status}: {raw[:240]}")
         try:
-            data = json.loads(raw)
-            msg = data["choices"][0]["message"]["content"]
-            if isinstance(msg, list):                                  # some APIs return content parts
-                msg = "".join(p.get("text", "") for p in msg if isinstance(p, dict))
-            text = (msg or "").strip()
-        except (ValueError, KeyError, IndexError, TypeError):
-            raise AIError("Meta AI sent a reply I could not read. Check META_API_URL points to the OpenAI-compatible endpoint.")
+            text = metaapi.extract_text(json.loads(raw))
+        except ValueError:
+            raise AIError("Meta AI sent a reply that was not JSON.")
         if not text:
-            raise AIError("Meta AI returned an empty answer.")
+            raise AIError(f"Meta AI answered but I could not find the text in it: {raw[:240]}")
         return text
 
     async def _chat_ollama(self, messages, *, json_mode=False, temperature=0.7, max_tokens=450):

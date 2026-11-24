@@ -26,8 +26,8 @@ AI_CONCURRENCY=1
 KB_PATH=kb.md
 AUTO_EMOJIS=1
 META_API_KEY=$META
-META_API_URL=https://api.llama.com/compat/v1
-META_MODEL=Llama-3.3-70B-Instruct
+META_API_URL=https://api.meta.ai/v1/responses
+META_MODEL=muse-wonder-1.0
 ENV
 chmod 600 .env
 echo ".env created."

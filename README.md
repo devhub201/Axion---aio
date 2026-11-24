@@ -63,7 +63,7 @@ Model size: 2-4 GB RAM -> qwen2.5:1.5b, 4-8 GB -> qwen2.5:3b (default), 8 GB+ ->
 - **Server stats**: `/serverstats setup` creates live voice channels (members, bots, boosts, open tickets).
 
 ## v1.3
-- **Meta AI**: put `META_API_KEY=...` in `.env` (or the panel variables) and the bot uses Meta for tickets, announcements and role panels; no Ollama needed (ideal for bot hosting). Check with `/ai status`. If it shows "not found", set `META_API_URL` / `META_MODEL` to what your Meta dashboard lists. Remove the key to go back to Ollama.
+- **Meta AI**: put `META_API_KEY=...` in `.env` (or the panel variables) and the bot uses Meta for tickets, announcements and role panels; no Ollama needed (ideal for bot hosting). Check with `/ai status`. Defaults: `META_API_URL=https://api.meta.ai/v1/responses`, `META_MODEL=muse-wonder-1.0` (from Meta's quickstart); change them only if your dashboard says otherwise. Remove the key to go back to Ollama.
 - **Birthdays**: `/birthday set|show|upcoming`, admin `/birthday setup` (announcement channel, optional birthday role, timezone default IST).
 - **Counting game**: `/counting setup #channel`, `/counting stats|reset`.
 - **Giveaway requirements**: `/giveaway start ... require_role min_invites min_level` (invites counted from when the bot joined).
