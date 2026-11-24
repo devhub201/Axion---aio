@@ -55,7 +55,17 @@ class AI:
         self.key_note = "" if raw_key == self.meta_key else " (cleaned: removed spaces/quotes/Bearer)"
         self.meta_url = os.getenv("META_API_URL", "https://api.meta.ai/v1/responses").rstrip("/")
         self.meta_model = os.getenv("META_MODEL", "muse-spark-1.3")
-        self.provider = "meta" if self.meta_key else "ollama"          # a Meta key in .env switches the AI to Meta
+        self.api_name = "Meta AI"
+        groq_raw = os.getenv("GROQ_API_KEY", "").strip().strip("\"'").strip()
+        if groq_raw.lower().startswith("bearer "):
+            groq_raw = groq_raw[7:].strip()
+        if groq_raw:                                                   # a Groq key wins: free, fast, OpenAI-style API
+            self.api_name = "Groq"
+            self.meta_key = groq_raw
+            self.key_note = ""
+            self.meta_url = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions").rstrip("/")
+            self.meta_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.provider = "meta" if self.meta_key else "ollama"          # an API key in .env switches the AI to the hosted API
         self.token = os.getenv("OLLAMA_TOKEN", "").strip()      # optional: for a reverse proxy in front of a remote Ollama
         self._sem = asyncio.Semaphore(int(os.getenv("AI_CONCURRENCY", "1")))
         self._session: Optional[aiohttp.ClientSession] = None
@@ -98,7 +108,7 @@ class AI:
 
     @property
     def label(self):
-        return f"Meta • {self.meta_model}" if self.provider == "meta" else f"Ollama • {self.model}"
+        return f"{self.api_name} • {self.meta_model}" if self.provider == "meta" else f"Ollama • {self.model}"
 
     async def chat(self, messages, *, json_mode=False, temperature=0.7, max_tokens=450):
         if self.provider == "meta":
@@ -127,27 +137,27 @@ class AI:
                                                  timeout=aiohttp.ClientTimeout(total=min(self.timeout, 90))) as resp:
                         raw, status = await resp.text(), resp.status
                 except asyncio.TimeoutError:
-                    raise AIError("Meta AI took too long to answer. Try again in a moment.")
+                    raise AIError(f"{self.api_name} took too long to answer. Try again in a moment.")
                 except aiohttp.ClientError as exc:
-                    raise AIError(f"Could not reach Meta AI at {endpoint}: {exc}")
+                    raise AIError(f"Could not reach {self.api_name} at {endpoint}: {exc}")
                 if status != 400:                              # 400 = this request shape was not accepted, try the simpler one
                     break
         if status != 200 and "billing" in raw.lower():
-            raise AIError("Meta AI says your account has a billing issue (billing_not_configured). Add or fix the payment method in the Meta developer dashboard, then try again. The key and model are fine.")
+            raise AIError(f"{self.api_name} says your account has a billing issue. Fix the payment method in its dashboard, then try again. The key and model are fine.")
         if status in (401, 403):
-            raise AIError(f"Meta AI rejected the API key (HTTP {status}). Meta's own message: {raw[:300] or '(empty)'}")
+            raise AIError(f"{self.api_name} rejected the API key (HTTP {status}). Its own message: {raw[:300] or '(empty)'}")
         if status == 404:
-            raise AIError(f"Meta AI says model/endpoint not found (HTTP 404). Model `{self.meta_model}`, URL `{endpoint}`. Meta's own message: {raw[:300] or '(empty)'}")
+            raise AIError(f"{self.api_name} says model/endpoint not found (HTTP 404). Model `{self.meta_model}`, URL `{endpoint}`. Its own message: {raw[:300] or '(empty)'}")
         if status == 429:
-            raise AIError("Meta AI rate limit reached. Wait a little or check your plan/credits.")
+            raise AIError(f"{self.api_name} rate limit reached. Wait a little or check your plan/credits.")
         if status != 200:
-            raise AIError(f"Meta AI returned HTTP {status}: {raw[:240]}")
+            raise AIError(f"{self.api_name} returned HTTP {status}: {raw[:240]}")
         try:
             text = metaapi.extract_text(json.loads(raw))
         except ValueError:
-            raise AIError("Meta AI sent a reply that was not JSON.")
+            raise AIError(f"{self.api_name} sent a reply that was not JSON.")
         if not text:
-            raise AIError(f"Meta AI answered but I could not find the text in it: {raw[:240]}")
+            raise AIError(f"{self.api_name} answered but I could not find the text in it: {raw[:240]}")
         return text
 
     async def _chat_ollama(self, messages, *, json_mode=False, temperature=0.7, max_tokens=450):
@@ -556,7 +566,7 @@ class AICog(commands.Cog, name="AI"):
         g = interaction.guild
         ok = h["reachable"] and h["model_ready"] and not h["error"]
         meta = self.bot.ai.provider == "meta"
-        fields = [("Provider", "Meta AI (API)" if meta else "Ollama (your VPS)", False),
+        fields = [("Provider", f"{self.bot.ai.api_name} (API)" if meta else "Ollama (your VPS)", False),
                   ("Server", f"`{self.bot.ai.meta_url if meta else self.bot.ai.url}`", False),
                   ("Model", f"`{self.bot.ai.meta_model if meta else self.bot.ai.model}`", True),
                   ("Reachable", "{online} yes" if h["reachable"] else "{offline} no", True),
@@ -568,7 +578,7 @@ class AICog(commands.Cog, name="AI"):
             fields.append(("Reply time", f"{h['latency']:.1f}s", True))
         if h["models"]:
             fields.append(("Installed models", ", ".join(f"`{m}`" for m in h["models"][:10]), False))
-        desc = ("Meta AI is connected." if meta else "Everything is running on your own VPS.") if ok else f"**Problem:** {h['error']}"
+        desc = (f"{self.bot.ai.api_name} is connected." if meta else "Everything is running on your own VPS.") if ok else f"**Problem:** {h['error']}"
         await interaction.followup.send(embed=brand.embed(self.bot, "ok" if ok else "err", "AI status", desc,
                                                           guild=g, fields=fields), ephemeral=True)
 

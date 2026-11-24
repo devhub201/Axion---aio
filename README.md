@@ -77,3 +77,7 @@ Model size: 2-4 GB RAM -> qwen2.5:1.5b, 4-8 GB -> qwen2.5:3b (default), 8 GB+ ->
 - `/ai status` fails: `systemctl status ollama`, `ollama list`.
 - Bot host: data/ (SQLite) must be writable and persistent.
 - Emojis fail: bot needs Manage Expressions; free animated slots needed (28).
+
+
+### Groq (free AI)
+Get a key at console.groq.com, then run `bash set_groq.sh YOUR_KEY` and restart the bot. A Groq key takes priority over Meta/Ollama.

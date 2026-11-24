@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Creates .env by asking questions (no nano needed).
 #   Interactive:   bash setup_env.sh
-#   One-liner:     bash setup_env.sh TOKEN GUILD_ID OWNER_ID [META_API_KEY]
+#   One-liner:     bash setup_env.sh TOKEN GUILD_ID OWNER_ID [META_API_KEY] [GROQ_API_KEY]
 cd "$(dirname "$0")"
 if [ -n "$1" ]; then
-  TOKEN="$1"; GUILD="$2"; OWNER="$3"; META="$4"; OLL="http://127.0.0.1:11434"
+  TOKEN="$1"; GUILD="$2"; OWNER="$3"; META="$4"; GROQ="$5"; OLL="http://127.0.0.1:11434"
 else
   read -rp "Bot token: " TOKEN
   read -rp "Server (guild) ID: " GUILD
   read -rp "Your Discord user ID: " OWNER
   read -rp "Meta AI API key (Enter to skip): " META
+  read -rp "Groq API key (Enter to skip): " GROQ
   OLL="http://127.0.0.1:11434"
 fi
 [ -n "$TOKEN" ] || { echo "Token is required"; exit 1; }
@@ -28,6 +29,8 @@ AUTO_EMOJIS=1
 META_API_KEY=$META
 META_API_URL=https://api.meta.ai/v1/responses
 META_MODEL=muse-spark-1.3
+GROQ_API_KEY=$GROQ
+GROQ_MODEL=llama-3.3-70b-versatile
 ENV
 chmod 600 .env
 echo ".env created."
