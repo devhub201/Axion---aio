@@ -54,7 +54,7 @@ class AI:
             self.meta_key = self.meta_key[7:].strip()                    # forgive a pasted "Bearer " prefix
         self.key_note = "" if raw_key == self.meta_key else " (cleaned: removed spaces/quotes/Bearer)"
         self.meta_url = os.getenv("META_API_URL", "https://api.meta.ai/v1/responses").rstrip("/")
-        self.meta_model = os.getenv("META_MODEL", "muse-wonder-1.0")
+        self.meta_model = os.getenv("META_MODEL", "muse-spark-1.3")
         self.provider = "meta" if self.meta_key else "ollama"          # a Meta key in .env switches the AI to Meta
         self.token = os.getenv("OLLAMA_TOKEN", "").strip()      # optional: for a reverse proxy in front of a remote Ollama
         self._sem = asyncio.Semaphore(int(os.getenv("AI_CONCURRENCY", "1")))
