@@ -30,7 +30,7 @@ import brand  # noqa: E402
 from db import Database  # noqa: E402
 from emojis import EmojiManager  # noqa: E402
 
-EXTENSIONS = ["emojis", "ai", "tickets", "automod", "antinuke", "community"]
+EXTENSIONS = ["emojis", "ai", "tickets", "automod", "antinuke", "community", "leveling", "economy", "utility", "hosting"]
 
 
 class AxionBot(commands.Bot):

@@ -640,7 +640,12 @@ class Community(commands.Cog, name="Community"):
                 ("{crown} Moderation", "`/warn` `/timeout` `/kick` `/ban` `/purge` `/lock` `/slowmode`", False),
                 ("{globe} Status board", "`/status setup` • `/status add` • `/status maintenance`", False),
                 ("{gift} Community", "`/giveaway start` • `/invites` • `/invite-leaderboard` • `/setup welcome|verify|logs`", False),
-                ("{star} Emojis", "`/emoji install` • `/emoji make` • `/emoji list`", False)]))
+                ("{star} Emojis", "`/emoji install` • `/emoji make` • `/emoji list`", False),
+                ("{rocket} Hosting", "`/plans-list` • `/payments` • `/tos` • `/vouch` • `/vouches` • `/customer`", False),
+                ("{stats} Levels", "`/rank` • `/leaderboard` • `/level role|settings`", False),
+                ("{bolt} BOLTs economy", "`/daily` `/work` `/balance` `/pay` `/coinflip` `/slots` `/richest` `/shop list|buy`", False),
+                ("{members} Engage", "`/poll create` • `/suggestion new` • `/remind` • `/afk` • `/avatar` • `/8ball` • `/roll`", False),
+                ("{ticket} Staff tools", "`/plans add|post` • `/embed` • `/rolepanel create` • `/sticky set` • `/responder add` • `/starboard setup` • `/tempvc setup`", False)]))
 
 
 async def setup(bot):

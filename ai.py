@@ -50,7 +50,7 @@ class AI:
         self.token = os.getenv("OLLAMA_TOKEN", "").strip()      # optional: for a reverse proxy in front of a remote Ollama
         self._sem = asyncio.Semaphore(int(os.getenv("AI_CONCURRENCY", "1")))
         self._session: Optional[aiohttp.ClientSession] = None
-        self._kb_cache = ("", 0.0)
+        self._kb_cache = ("", None)
 
     # ---------------------------------------------------------------- plumbing
     @property
@@ -65,13 +65,26 @@ class AI:
             await self._session.close()
 
     def kb(self):
+        text = ""
         try:
             mtime = os.path.getmtime(self.kb_path)
         except OSError:
-            return ""
-        if mtime != self._kb_cache[1]:
-            with open(self.kb_path, "r", encoding="utf-8") as fh:
-                self._kb_cache = (fh.read()[:7000], mtime)
+            mtime = 0.0
+        plans_path = os.path.join("data", "plans_kb.md")
+        try:
+            pm = os.path.getmtime(plans_path)
+        except OSError:
+            pm = 0.0
+        stamp = (mtime, pm)
+        if stamp != self._kb_cache[1]:
+            parts = []
+            for path in (plans_path, self.kb_path):
+                try:
+                    with open(path, "r", encoding="utf-8") as fh:
+                        parts.append(fh.read())
+                except OSError:
+                    pass
+            self._kb_cache = ("\n\n".join(parts)[:7000], stamp)
         return self._kb_cache[0]
 
     async def chat(self, messages, *, json_mode=False, temperature=0.7, max_tokens=450):

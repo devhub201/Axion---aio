@@ -34,6 +34,45 @@ CREATE TABLE IF NOT EXISTS giveaway_entries(
 CREATE TABLE IF NOT EXISTS services(
     id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, name TEXT, kind TEXT,
     target TEXT, last_ok INTEGER DEFAULT 1, maint INTEGER DEFAULT 0, UNIQUE(guild_id, name));
+CREATE TABLE IF NOT EXISTS levels(
+    guild_id INTEGER, user_id INTEGER, xp INTEGER DEFAULT 0, level INTEGER DEFAULT 0, msgs INTEGER DEFAULT 0,
+    PRIMARY KEY(guild_id, user_id));
+
+CREATE TABLE IF NOT EXISTS economy(
+    guild_id INTEGER, user_id INTEGER, wallet INTEGER DEFAULT 0, last_daily REAL DEFAULT 0,
+    last_work REAL DEFAULT 0, streak INTEGER DEFAULT 0, PRIMARY KEY(guild_id, user_id));
+
+CREATE TABLE IF NOT EXISTS shop(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, name TEXT, price INTEGER,
+    role_id INTEGER, description TEXT, UNIQUE(guild_id, name));
+
+CREATE TABLE IF NOT EXISTS reminders(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, guild_id INTEGER, channel_id INTEGER,
+    text TEXT, due REAL);
+
+CREATE TABLE IF NOT EXISTS afk(guild_id INTEGER, user_id INTEGER, reason TEXT, since REAL, PRIMARY KEY(guild_id, user_id));
+
+CREATE TABLE IF NOT EXISTS stickies(channel_id INTEGER PRIMARY KEY, guild_id INTEGER, text TEXT, last_msg_id INTEGER);
+
+CREATE TABLE IF NOT EXISTS responders(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, trigger TEXT, reply TEXT, UNIQUE(guild_id, trigger));
+
+CREATE TABLE IF NOT EXISTS vouches(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, user_id INTEGER, stars INTEGER, text TEXT, created_at REAL);
+
+CREATE TABLE IF NOT EXISTS suggestions(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, message_id INTEGER UNIQUE, user_id INTEGER,
+    text TEXT, status TEXT DEFAULT 'open');
+
+CREATE TABLE IF NOT EXISTS suggestion_votes(message_id INTEGER, user_id INTEGER, vote INTEGER, PRIMARY KEY(message_id, user_id));
+
+CREATE TABLE IF NOT EXISTS polls(
+    message_id INTEGER PRIMARY KEY, guild_id INTEGER, question TEXT, options TEXT, ends_at REAL,
+    ended INTEGER DEFAULT 0, channel_id INTEGER);
+
+CREATE TABLE IF NOT EXISTS poll_votes(message_id INTEGER, user_id INTEGER, choice INTEGER, PRIMARY KEY(message_id, user_id));
+
+CREATE TABLE IF NOT EXISTS starred(message_id INTEGER PRIMARY KEY, guild_id INTEGER, board_msg_id INTEGER);
 """
 
 
